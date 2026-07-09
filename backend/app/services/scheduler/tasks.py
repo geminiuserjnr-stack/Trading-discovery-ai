@@ -1,7 +1,9 @@
 import datetime
 from celery import shared_task
 from backend.app.database.session import SessionLocal
-from backend.app.models.models import SchedulerJob, SystemLog
+from backend.app.models.models import SchedulerJob, SystemLog, CrawlJob
+from backend.app.services.crawler.search_scheduler import execute_next_search
+from backend.app.services.crawler.crawl_worker import schedule_channel_refreshes, process_channel_crawl_job
 from backend.app.services.logging.logger import sys_logger
 
 
@@ -53,25 +55,54 @@ def log_job_execution(job_name: str, status: str, error_message: str = None):
 @shared_task(name="backend.app.services.scheduler.tasks.run_search_queue")
 def run_search_queue():
     sys_logger.info("Scheduler task: run_search_queue triggered")
+    db = SessionLocal()
     try:
+        res = execute_next_search(db)
         log_job_execution("run_search_queue", "success")
-        return {"status": "success", "task": "run_search_queue"}
+        return {"status": "success", "result": res}
     except Exception as e:
         sys_logger.error(f"Error in run_search_queue: {e}")
         log_job_execution("run_search_queue", "failed", str(e))
         raise
+    finally:
+        db.close()
 
 
 @shared_task(name="backend.app.services.scheduler.tasks.refresh_active_channels")
 def refresh_active_channels():
     sys_logger.info("Scheduler task: refresh_active_channels triggered")
+    db = SessionLocal()
     try:
+        # 1. Schedule channel refreshes based on policies
+        scheduled_count = schedule_channel_refreshes(db)
+
+        # 2. Pick and process any pending crawl jobs (limited to 5 per run for safety/quota)
+        pending_jobs = db.query(CrawlJob).filter(CrawlJob.status == "pending").order_by(
+            CrawlJob.priority.desc(),
+            CrawlJob.created_time.asc()
+        ).limit(5).all()
+
+        processed_count = 0
+        for job in pending_jobs:
+            # Mark job running
+            job.status = "running"
+            db.commit()
+            success = process_channel_crawl_job(db, job)
+            if success:
+                processed_count += 1
+
         log_job_execution("refresh_active_channels", "success")
-        return {"status": "success", "task": "refresh_active_channels"}
+        return {
+            "status": "success",
+            "channels_scheduled": scheduled_count,
+            "jobs_processed": processed_count
+        }
     except Exception as e:
         sys_logger.error(f"Error in refresh_active_channels: {e}")
         log_job_execution("refresh_active_channels", "failed", str(e))
         raise
+    finally:
+        db.close()
 
 
 @shared_task(name="backend.app.services.scheduler.tasks.generate_search_queries")
