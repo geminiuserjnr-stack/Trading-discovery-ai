@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -10,13 +11,13 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     # Database URLs
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/trading_discovery"
+    DATABASE_URL: str = "postgresql://postgres:postgres@127.0.0.1:5432/trading_discovery"
     ASYNC_DATABASE_URL: Optional[str] = None
 
     # Redis / Celery
-    REDIS_URL: str = "redis://localhost:6379/0"
-    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+    REDIS_URL: str = "redis://127.0.0.1:6379/0"
+    CELERY_BROKER_URL: str = "redis://127.0.0.1:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://127.0.0.1:6379/0"
 
     # YouTube API Configuration
     YOUTUBE_API_KEY: str = "mock_api_key_for_now"
@@ -41,6 +42,11 @@ class Settings(BaseSettings):
     )
 
     def model_post_init(self, __context) -> None:
+        # Detect pytest and override defaults
+        is_testing = "pytest" in sys.modules or any("pytest" in arg for arg in sys.argv)
+        if is_testing:
+            self.DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:5432/trading_discovery_test"
+
         if not self.ASYNC_DATABASE_URL:
             # Auto-build async db url from database url if not specified
             self.ASYNC_DATABASE_URL = self.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")

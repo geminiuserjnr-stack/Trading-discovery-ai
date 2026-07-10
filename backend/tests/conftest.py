@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import create_engine
 
 # Set test database URL before any other imports to override Pydantic Settings
-os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@localhost:5432/trading_discovery_test"
+os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@127.0.0.1:5432/trading_discovery_test"
 
 from backend.app.config.settings import settings
 from backend.app.database.base import Base
