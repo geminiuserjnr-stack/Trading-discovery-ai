@@ -17,7 +17,7 @@ class Query(Base):
     phrase_count = Column(Integer, default=0)
     effectiveness_score = Column(Float, default=0.0)
     last_executed = Column(DateTime, nullable=True)
-    status = Column(String, default="active")  # active, exhausted, etc.
+    status = Column(String, default="active")  # active, exhausted, paused
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -40,6 +40,16 @@ class Channel(Base):
     last_crawled = Column(DateTime, nullable=True)
     discovery_query = Column(String, nullable=True)
     active = Column(Boolean, default=True)
+
+    # Phase 1B Quality Flags & Metrics
+    is_german = Column(Boolean, default=False)
+    is_trading = Column(Boolean, default=False)
+    has_recent_uploads = Column(Boolean, default=False)
+    has_community_links = Column(Boolean, default=False)
+    needs_manual_review = Column(Boolean, default=False)
+    last_seen = Column(DateTime, default=datetime.utcnow, nullable=False)
+    language_confidence = Column(Float, default=0.0)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -60,6 +70,11 @@ class Video(Base):
     processed = Column(Boolean, default=False)
     transcript_available = Column(Boolean, default=False)
     last_processed = Column(DateTime, nullable=True)
+
+    # Phase 1B Video Metadata Extensions
+    thumbnail_url = Column(String, nullable=True)
+    language_confidence = Column(Float, default=0.0)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -124,6 +139,14 @@ class CrawlJob(Base):
     videos_found = Column(Integer, default=0)
     transcripts_found = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
+
+    # Phase 1B Crawl Job Queue Fields
+    channel_id = Column(String, nullable=True)
+    priority = Column(Integer, default=0)  # higher is higher priority
+    reason = Column(String, nullable=True)  # new discovery, scheduled refresh, manual request
+    retry_count = Column(Integer, default=0)
+    created_time = Column(DateTime, default=datetime.utcnow, nullable=False)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -174,5 +197,47 @@ class SystemLog(Base):
     message = Column(Text, nullable=False)
     module = Column(String, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+# Phase 1B New Tables
+
+class SearchResult(Base):
+    __tablename__ = "search_results"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    query_id = Column(UUID(as_uuid=True), nullable=True)
+    search_timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    returned_video_ids = Column(Text, nullable=True)  # comma separated list or JSON string
+    returned_channel_ids = Column(Text, nullable=True)  # comma separated list or JSON string
+    next_page_token = Column(String, nullable=True)
+    api_response_status = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class ApiQuotaLog(Base):
+    __tablename__ = "api_quota_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    log_date = Column(DateTime, default=datetime.utcnow, nullable=False)
+    daily_quota_consumed = Column(Integer, default=0)
+    remaining_quota_estimate = Column(Integer, default=10000)
+    requests_made = Column(Integer, default=0)
+    failed_requests = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class CommunityLink(Base):
+    __tablename__ = "community_links"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    channel_id = Column(String, ForeignKey("channels.channel_id"), nullable=True)
+    video_id = Column(String, ForeignKey("videos.video_id"), nullable=True)
+    platform = Column(String, nullable=False)  # discord, telegram, skool, patreon, website
+    url = Column(String, nullable=False)
+    detected_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

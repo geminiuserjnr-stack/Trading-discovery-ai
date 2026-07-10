@@ -12,4 +12,7 @@ from backend.app.models.models import (  # noqa
     LanguageStatistics,
     QueryHistory,
     SystemLog,
+    SearchResult,
+    ApiQuotaLog,
+    CommunityLink,
 )
