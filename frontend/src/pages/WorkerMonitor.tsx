@@ -2,13 +2,14 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Cpu, RefreshCw, ShieldCheck, Activity } from 'lucide-react';
 import { Button, StatusBadge, LoadingSkeleton, ErrorState } from '../components/UI';
+import { API_BASE_URL } from '../config';
 
 export const WorkerMonitor: React.FC = () => {
   // Fetch Celery workers stats
   const { data: workersData, isLoading, error, refetch } = useQuery<any>({
     queryKey: ['workers-stats'],
     queryFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/workers');
+      const res = await fetch(`${API_BASE_URL}/workers`);
       if (!res.ok) throw new Error('Failed to retrieve Celery worker diagnostics');
       return res.json();
     }

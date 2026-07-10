@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import {
-  PlaySquare, RefreshCw, ShieldCheck
-} from 'lucide-react';
+import { PlaySquare, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Button, StatusBadge, SearchBox, Drawer, LoadingSkeleton, ErrorState, EmptyState } from '../components/UI';
+import { API_BASE_URL } from '../config';
 
 export const Videos: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,7 +25,7 @@ export const Videos: React.FC = () => {
   const { data: videos, isLoading, error, refetch } = useQuery<any[]>({
     queryKey: ['videos', processedOnly],
     queryFn: async () => {
-      const url = `http://127.0.0.1:8000/videos?limit=100&processed_only=${processedOnly}`;
+      const url = `${API_BASE_URL}/videos?limit=100&processed_only=${processedOnly}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to retrieve discovered videos');
       return res.json();
@@ -38,7 +37,7 @@ export const Videos: React.FC = () => {
     queryKey: ['video-detail', selectedVideoId],
     queryFn: async () => {
       if (!selectedVideoId) return null;
-      const res = await fetch(`http://127.0.0.1:8000/videos/${selectedVideoId}`);
+      const res = await fetch(`${API_BASE_URL}/videos/${selectedVideoId}`);
       if (!res.ok) throw new Error('Failed to retrieve video detailed profile');
       return res.json();
     },
@@ -129,7 +128,7 @@ export const Videos: React.FC = () => {
                     className="h-10 text-xs text-darkText hover:bg-darkBg/60 cursor-pointer transition-colors border-b border-darkBorder"
                   >
                     <td className="pl-4 py-1.5 font-semibold text-darkText flex items-center gap-2 max-w-[280px]">
-                      <PlaySquare size={14} className="text-accentPrimary flex-shrink-0" />
+                      <PlaySquare size={14} className="text-accentPrimary" />
                       <span className="truncate">{vid.title}</span>
                     </td>
                     <td className="py-1.5 font-mono text-xs text-darkMuted truncate max-w-[150px]">

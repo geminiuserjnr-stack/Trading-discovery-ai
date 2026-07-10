@@ -5,6 +5,7 @@ import { RefreshCw, Link as LinkIcon } from 'lucide-react';
 import { Button, StatusBadge, SearchBox, Drawer, LoadingSkeleton, ErrorState, EmptyState } from '../components/UI';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config';
 
 export const Channels: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,7 +30,7 @@ export const Channels: React.FC = () => {
   const { data: channels, isLoading, error, refetch } = useQuery<any[]>({
     queryKey: ['channels', germanOnly],
     queryFn: async () => {
-      const url = `http://127.0.0.1:8000/channels?limit=100&german_only=${germanOnly}`;
+      const url = `${API_BASE_URL}/channels?limit=100&german_only=${germanOnly}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to retrieve discovered channels');
       return res.json();
@@ -41,7 +42,7 @@ export const Channels: React.FC = () => {
     queryKey: ['channel-detail', selectedChannelId],
     queryFn: async () => {
       if (!selectedChannelId) return null;
-      const res = await fetch(`http://127.0.0.1:8000/channels/${selectedChannelId}`);
+      const res = await fetch(`${API_BASE_URL}/channels/${selectedChannelId}`);
       if (!res.ok) throw new Error('Failed to retrieve channel detailed profile');
       return res.json();
     },
@@ -51,7 +52,7 @@ export const Channels: React.FC = () => {
   // Manual Crawl Trigger Mutation
   const crawlMutation = useMutation({
     mutationFn: async (channelId: string) => {
-      const res = await fetch('http://127.0.0.1:8000/crawl/trigger', {
+      const res = await fetch(`${API_BASE_URL}/crawl/trigger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channel_id: channelId })

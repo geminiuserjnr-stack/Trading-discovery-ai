@@ -4,6 +4,7 @@ import { Calendar, RefreshCw } from 'lucide-react';
 import { Button, StatusBadge, LoadingSkeleton, ErrorState, EmptyState } from '../components/UI';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config';
 
 export const SchedulerMonitor: React.FC = () => {
   const queryClient = useQueryClient();
@@ -14,7 +15,7 @@ export const SchedulerMonitor: React.FC = () => {
   const { data: jobs, isLoading, error, refetch } = useQuery<any[]>({
     queryKey: ['scheduler-jobs'],
     queryFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/scheduler/jobs');
+      const res = await fetch(`${API_BASE_URL}/scheduler/jobs`);
       if (!res.ok) throw new Error('Failed to retrieve active scheduler jobs');
       return res.json();
     }
@@ -23,7 +24,7 @@ export const SchedulerMonitor: React.FC = () => {
   // Run Now Mutation
   const runNowMutation = useMutation({
     mutationFn: async (jobName: string) => {
-      const res = await fetch(`http://127.0.0.1:8000/scheduler/run?job_name=${jobName}`, { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/scheduler/run?job_name=${jobName}`, { method: 'POST' });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail || 'Failed to trigger job');

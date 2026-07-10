@@ -448,13 +448,20 @@ def populate_dashboard_seed_data(db: Session):
 
 @app.on_event("startup")
 def startup_event():
-    db = SessionLocal()
-    try:
-        populate_dashboard_seed_data(db)
-    except Exception as e:
-        sys_logger.error(f"Startup seed data check failed: {e}")
-    finally:
-        db.close()
+    import os
+    env_seed = os.getenv("SEED_DEVELOPMENT_DATA", "").lower()
+    should_seed = env_seed == "true" or (env_seed != "false" and settings.APP_ENV == "development")
+
+    if should_seed:
+        db = SessionLocal()
+        try:
+            populate_dashboard_seed_data(db)
+        except Exception as e:
+            sys_logger.error(f"Startup seed data check failed: {e}")
+        finally:
+            db.close()
+    else:
+        sys_logger.info("Production mode or SEED_DEVELOPMENT_DATA=false detected. Skipping database seeding.")
 
 
 @app.get("/health", response_model=schemas.HealthResponse)

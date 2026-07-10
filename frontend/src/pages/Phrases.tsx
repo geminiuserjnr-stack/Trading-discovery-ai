@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Hash, RefreshCw, Layers, TrendingUp, ArrowRight
-} from 'lucide-react';
+import { Hash, RefreshCw, Layers, TrendingUp, ArrowRight } from 'lucide-react';
 import { Button, SearchBox, Drawer, LoadingSkeleton, ErrorState, EmptyState } from '../components/UI';
+import { API_BASE_URL } from '../config';
 
 export const Phrases: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,7 +25,7 @@ export const Phrases: React.FC = () => {
   const { data: phrases, isLoading, error, refetch } = useQuery<any[]>({
     queryKey: ['phrases', minQuality],
     queryFn: async () => {
-      const url = `http://127.0.0.1:8000/phrases?limit=100&min_quality=${minQuality}`;
+      const url = `${API_BASE_URL}/phrases?limit=100&min_quality=${minQuality}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to retrieve extracted terminology phrases');
       return res.json();
@@ -38,7 +37,7 @@ export const Phrases: React.FC = () => {
     queryKey: ['phrase-detail', selectedPhrase],
     queryFn: async () => {
       if (!selectedPhrase) return null;
-      const res = await fetch(`http://127.0.0.1:8000/phrases/${encodeURIComponent(selectedPhrase)}`);
+      const res = await fetch(`${API_BASE_URL}/phrases/${encodeURIComponent(selectedPhrase)}`);
       if (!res.ok) throw new Error('Failed to retrieve phrase specific details');
       return res.json();
     },
