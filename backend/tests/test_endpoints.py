@@ -18,6 +18,8 @@ engine = create_engine(settings.DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+from backend.app.models.models import Transcript
+
 @pytest.fixture(autouse=True)
 def clean_db():
     Base.metadata.create_all(bind=engine)
@@ -25,6 +27,7 @@ def clean_db():
     # Delete from child tables first to respect foreign keys
     db.query(CommunityLink).delete()
     db.query(CrawlJob).delete()
+    db.query(Transcript).delete()
     db.query(Video).delete()
     db.query(Channel).delete()
     db.query(ApiQuotaLog).delete()

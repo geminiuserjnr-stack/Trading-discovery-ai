@@ -21,6 +21,17 @@ class Query(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    # Phase 1C Fields
+    parent_phrase = Column(String, nullable=True)
+    generation_time = Column(DateTime, nullable=True)
+    confidence_score = Column(Float, nullable=True)
+    new_channels_discovered = Column(Integer, default=0)
+    new_videos_discovered = Column(Integer, default=0)
+    duplicate_rate = Column(Float, default=0.0)
+    new_phrases_discovered = Column(Integer, default=0)
+    cost_per_new_channel = Column(Float, default=0.0)
+    priority_modifier = Column(Float, default=1.0)
+
 
 class Channel(Base):
     __tablename__ = "channels"
@@ -50,6 +61,9 @@ class Channel(Base):
     last_seen = Column(DateTime, default=datetime.utcnow, nullable=False)
     language_confidence = Column(Float, default=0.0)
 
+    # Phase 1C Fields
+    topic = Column(String, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -74,6 +88,10 @@ class Video(Base):
     # Phase 1B Video Metadata Extensions
     thumbnail_url = Column(String, nullable=True)
     language_confidence = Column(Float, default=0.0)
+
+    # Phase 1C Fields
+    transcript_attempted = Column(Boolean, default=False, nullable=False)
+    topic = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -105,6 +123,10 @@ class Phrase(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    # Phase 1C Fields
+    average_recency = Column(Float, default=0.0)
+    average_subscribers = Column(Float, default=0.0)
+
 
 class VideoPhrase(Base):
     __tablename__ = "video_phrases"
@@ -113,6 +135,35 @@ class VideoPhrase(Base):
     video_id = Column(String, ForeignKey("videos.video_id"), nullable=False)
     phrase = Column(String, ForeignKey("phrases.phrase"), nullable=False)
     count = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Phase 1C Fields
+    channel_id = Column(String, nullable=True)
+    source = Column(String, nullable=True)
+    first_seen = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_seen = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class PhraseScore(Base):
+    __tablename__ = "phrase_scores"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    phrase = Column(String, ForeignKey("phrases.phrase"), nullable=False)
+    score = Column(Float, default=0.0, nullable=False)
+    version = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class PhraseRelationship(Base):
+    __tablename__ = "phrase_relationships"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    phrase_a = Column(String, ForeignKey("phrases.phrase"), nullable=False)
+    phrase_b = Column(String, ForeignKey("phrases.phrase"), nullable=False)
+    relationship_type = Column(String, nullable=False)  # co_occurrence, same_channel, same_topic
+    strength = Column(Float, default=1.0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -173,7 +224,7 @@ class LanguageStatistics(Base):
     video_count = Column(Integer, default=0)
     phrase_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class QueryHistory(Base):
