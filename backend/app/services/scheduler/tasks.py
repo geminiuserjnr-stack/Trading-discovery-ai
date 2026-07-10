@@ -4,6 +4,7 @@ from backend.app.database.session import SessionLocal
 from backend.app.models.models import SchedulerJob, SystemLog, CrawlJob
 from backend.app.services.crawler.search_scheduler import execute_next_search
 from backend.app.services.crawler.crawl_worker import schedule_channel_refreshes, process_channel_crawl_job
+from backend.app.services.crawler.learning_loop import LearningLoopOrchestrator
 from backend.app.services.logging.logger import sys_logger
 
 
@@ -108,13 +109,35 @@ def refresh_active_channels():
 @shared_task(name="backend.app.services.scheduler.tasks.generate_search_queries")
 def generate_search_queries():
     sys_logger.info("Scheduler task: generate_search_queries triggered")
+    db = SessionLocal()
     try:
+        orchestrator = LearningLoopOrchestrator()
+        result = orchestrator.run_complete_learning_cycle(db)
         log_job_execution("generate_search_queries", "success")
-        return {"status": "success", "task": "generate_search_queries"}
+        return {"status": "success", "result": result}
     except Exception as e:
         sys_logger.error(f"Error in generate_search_queries: {e}")
         log_job_execution("generate_search_queries", "failed", str(e))
         raise
+    finally:
+        db.close()
+
+
+@shared_task(name="backend.app.services.scheduler.tasks.run_complete_learning_cycle")
+def run_complete_learning_cycle():
+    sys_logger.info("Scheduler task: run_complete_learning_cycle triggered")
+    db = SessionLocal()
+    try:
+        orchestrator = LearningLoopOrchestrator()
+        result = orchestrator.run_complete_learning_cycle(db)
+        log_job_execution("run_complete_learning_cycle", "success")
+        return {"status": "success", "result": result}
+    except Exception as e:
+        sys_logger.error(f"Error in run_complete_learning_cycle: {e}")
+        log_job_execution("run_complete_learning_cycle", "failed", str(e))
+        raise
+    finally:
+        db.close()
 
 
 @shared_task(name="backend.app.services.scheduler.tasks.recalculate_rankings")
