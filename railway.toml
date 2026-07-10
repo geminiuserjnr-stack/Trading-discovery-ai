@@ -1,0 +1,9 @@
+# Railway production deployment configuration
+[build]
+builder = "dockerfile"
+dockerfilePath = "backend/docker/Dockerfile"
+
+[deploy]
+startCommand = "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
+restartPolicyType = "on-failure"
+restartPolicyMaxRetries = 5
