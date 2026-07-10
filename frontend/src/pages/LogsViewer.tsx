@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Terminal, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button, SearchBox, LoadingSkeleton } from '../components/UI';
+import { API_BASE_URL } from '../config';
 
 export const LogsViewer: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -14,7 +15,7 @@ export const LogsViewer: React.FC = () => {
   const { data: logsData, isLoading, refetch } = useQuery<any>({
     queryKey: ['system-logs', level, moduleFilter, search, page],
     queryFn: async () => {
-      let url = `http://127.0.0.1:8000/logs?skip=${page * limit}&limit=${limit}`;
+      let url = `${API_BASE_URL}/logs?skip=${page * limit}&limit=${limit}`;
       if (level !== 'all') url += `&level=${level}`;
       if (moduleFilter !== 'all') url += `&module=${moduleFilter}`;
       if (search.trim()) url += `&search=${encodeURIComponent(search)}`;

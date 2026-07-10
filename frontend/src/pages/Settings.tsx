@@ -4,6 +4,7 @@ import { Settings as SettingsIcon, Save } from 'lucide-react';
 import { Button, LoadingSkeleton, ErrorState, StatusBadge } from '../components/UI';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config';
 
 export const Settings: React.FC = () => {
   const queryClient = useQueryClient();
@@ -26,7 +27,7 @@ export const Settings: React.FC = () => {
   const { data: settingsData, isLoading, error, refetch } = useQuery<any>({
     queryKey: ['system-settings'],
     queryFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/settings');
+      const res = await fetch(`${API_BASE_URL}/settings`);
       if (!res.ok) throw new Error('Failed to retrieve system configuration');
       return res.json();
     }
@@ -48,7 +49,7 @@ export const Settings: React.FC = () => {
   // Update Settings Mutation
   const saveMutation = useMutation({
     mutationFn: async (payload: any) => {
-      const res = await fetch('http://127.0.0.1:8000/settings', {
+      const res = await fetch(`${API_BASE_URL}/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

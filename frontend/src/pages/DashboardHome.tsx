@@ -6,6 +6,7 @@ import {
   BarChart2, Radio, ShieldAlert
 } from 'lucide-react';
 import { MetricCard, LoadingSkeleton, ErrorState, StatusBadge } from '../components/UI';
+import { API_BASE_URL } from '../config';
 
 export const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export const DashboardHome: React.FC = () => {
   const { data: stats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useQuery<any>({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/stats');
+      const res = await fetch(`${API_BASE_URL}/stats`);
       if (!res.ok) throw new Error('Failed to retrieve system statistics');
       return res.json();
     },
@@ -25,7 +26,7 @@ export const DashboardHome: React.FC = () => {
   const { data: health, isLoading: healthLoading, error: healthError, refetch: refetchHealth } = useQuery<any>({
     queryKey: ['system-health'],
     queryFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/health');
+      const res = await fetch(`${API_BASE_URL}/health`);
       if (!res.ok) throw new Error('Failed to retrieve service health status');
       return res.json();
     },

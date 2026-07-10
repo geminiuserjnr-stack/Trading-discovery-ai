@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { WS_BASE_URL } from '../config';
 
 interface SidebarItem {
   name: string;
@@ -44,7 +45,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   // Mock connecting to backend WebSocket server for live updates
   useEffect(() => {
     // Attempt WebSocket connection
-    const wsUrl = `ws://${window.location.hostname}:8000/ws/events`;
+    const wsUrl = `${WS_BASE_URL}/ws/events`;
     let socket: WebSocket | null = null;
     let fallbackInterval: any = null;
 
