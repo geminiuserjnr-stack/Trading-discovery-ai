@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy application files
 COPY app /app/backend/app
 COPY migrations /app/backend/migrations
-
+COPY alembic.ini /app/backend/alembic.ini
 
 # Set Python path to make backend importable
 ENV PYTHONPATH=/app
