@@ -42,17 +42,6 @@ class Settings(BaseSettings):
     )
 
     def model_post_init(self, __context) -> None:
-        # Prioritize absolute system environment variables over Pydantic file defaults
-        env_db_url = os.getenv("DATABASE_URL")
-        if env_db_url:
-            self.DATABASE_URL = env_db_url
-
-        env_redis_url = os.getenv("REDIS_URL")
-        if env_redis_url:
-            self.REDIS_URL = env_redis_url
-            self.CELERY_BROKER_URL = env_redis_url
-            self.CELERY_RESULT_BACKEND = env_redis_url
-
         # Detect pytest and override defaults
         is_testing = "pytest" in sys.modules or any("pytest" in arg for arg in sys.argv)
         if is_testing:
