@@ -1,6 +1,9 @@
 [build]
 builder = "NIXPACKS"
 
+[env]
+NODE_VERSION = "20"
+
 [deploy]
 startCommand = "npm run preview"
 restartPolicyType = "ON_FAILURE"
