@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { WS_BASE_URL, API_BASE_URL } from '../config';
+import { WS_BASE_URL } from '../config';
 
 interface SidebarItem {
   name: string;
