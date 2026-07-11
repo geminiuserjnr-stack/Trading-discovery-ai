@@ -109,32 +109,6 @@ def register_default_scheduler_jobs(db: Session):
     db.commit()
 
 
-def register_default_scheduler_jobs(db: Session):
-    """Ensure default celery beat tasks are pre-populated in scheduler monitor database."""
-    default_jobs = [
-        "run_search_queue",
-        "refresh_active_channels",
-        "generate_search_queries",
-        "recalculate_rankings",
-        "cleanup_old_logs",
-        "update_statistics"
-    ]
-    now = datetime.datetime.utcnow()
-    for job_name in default_jobs:
-        job = db.query(SchedulerJob).filter(SchedulerJob.job_name == job_name).first()
-        if not job:
-            job = SchedulerJob(
-                id=uuid.uuid4(),
-                job_name=job_name,
-                status="idle",
-                last_run=None,
-                next_run=now + datetime.timedelta(minutes=15),
-                last_error=None
-            )
-            db.add(job)
-    db.commit()
-
-
 @app.on_event("startup")
 def startup_event():
     from backend.app.services.crawler.search_scheduler import populate_seed_queries
@@ -153,22 +127,6 @@ def startup_event():
         sys_logger.error(f"Startup system register failed: {e}")
     finally:
         db.close()
-
-    # Dynamic Development Seeding (restricted strictly to dev environments)
-    env_seed = os.getenv("SEED_DEVELOPMENT_DATA", "").lower()
-    should_seed = (env_seed == "true") and (settings.APP_ENV != "production")
-
-    if should_seed:
-        db = SessionLocal()
-        try:
-            populate_dashboard_seed_data(db)
-            log_system_event("INFO", "Database", "Development mock dataset successfully seeded.")
-        except Exception as e:
-            sys_logger.error(f"Startup seed data check failed: {e}")
-        finally:
-            db.close()
-    else:
-        sys_logger.info("Production mode or SEED_DEVELOPMENT_DATA not true. Skipping database seeding.")
 
 
 @app.get("/health", response_model=schemas.HealthResponse)
