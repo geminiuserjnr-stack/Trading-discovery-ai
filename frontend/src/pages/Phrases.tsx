@@ -193,7 +193,7 @@ export const Phrases: React.FC = () => {
               </div>
             </div>
 
-            {/* Frequency trend graph mock representation */}
+            {/* Frequency trend graph representation */}
             <div className="space-y-1.5">
               <span className="text-[9px] font-mono tracking-widest text-darkMuted block uppercase">Frequency Growth Trend</span>
               <div className="p-3 bg-darkBg border border-darkBorder rounded flex items-end justify-between h-20 px-6">

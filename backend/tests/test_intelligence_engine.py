@@ -57,27 +57,33 @@ def test_transcript_service_caching_and_fallback(clean_db):
     clean_db.add(video)
     clean_db.commit()
 
-    service = TranscriptService(is_mock_mode=True)
+    service = TranscriptService()
 
-    # 1. Retrieve first time (should generate and cache mock transcript)
-    transcript_record = service.get_and_cache_transcript(clean_db, "mock_vid_test_1")
-    assert transcript_record is not None
-    assert transcript_record.video_id == "mock_vid_test_1"
-    assert "Daytrading" in transcript_record.text or "Heute" in transcript_record.text
-    assert transcript_record.source == "mock"
+    from unittest.mock import patch, MagicMock
+    with patch("backend.app.services.transcripts.transcript_service.YouTubeTranscriptApi") as mock_api:
+        mock_api.get_transcript.return_value = [{"text": "Heute Daytrading lernen an der Boerse dax"}]
+        mock_metadata = MagicMock()
+        mock_api.list_transcripts.return_value = mock_metadata
+        mock_metadata.find_transcript.return_value.language_code = "de"
+        mock_metadata.find_transcript.return_value.is_manual = False
+        mock_metadata.__iter__.return_value = []
 
-    # Refresh Video from DB
-    clean_db.refresh(video)
-    assert video.transcript_available is True
-    assert video.transcript_attempted is True
+        # 1. Retrieve first time (should call API and cache it)
+        transcript_record = service.get_and_cache_transcript(clean_db, "mock_vid_test_1")
+        assert transcript_record is not None
+        assert transcript_record.video_id == "mock_vid_test_1"
+        assert "Daytrading" in transcript_record.text or "Heute" in transcript_record.text
 
-    # 2. Retrieve again (should hit cache)
-    cached_record = service.get_and_cache_transcript(clean_db, "mock_vid_test_1")
-    assert cached_record.retrieved_at == transcript_record.retrieved_at
+        # Refresh Video from DB
+        clean_db.refresh(video)
+        assert video.transcript_available is True
+        assert video.transcript_attempted is True
 
-    # 3. Retrieve non-existent transcript (no mock ID, and not mock mode)
-    # Turn off mock mode
-    service_strict = TranscriptService(is_mock_mode=False)
+        # 2. Retrieve again (should hit cache)
+        cached_record = service.get_and_cache_transcript(clean_db, "mock_vid_test_1")
+        assert cached_record.retrieved_at == transcript_record.retrieved_at
+
+    # 3. Retrieve non-existent transcript
     video_no_trans = Video(
         video_id="real_no_transcript_id_999",
         channel_id="chan_id_123",
@@ -89,8 +95,10 @@ def test_transcript_service_caching_and_fallback(clean_db):
     clean_db.add(video_no_trans)
     clean_db.commit()
 
-    res = service_strict.get_and_cache_transcript(clean_db, "real_no_transcript_id_999")
-    assert res is None
+    with patch("backend.app.services.transcripts.transcript_service.YouTubeTranscriptApi") as mock_api:
+        mock_api.get_transcript.side_effect = Exception("Not available")
+        res = service.get_and_cache_transcript(clean_db, "real_no_transcript_id_999")
+        assert res is None
 
     # Check that transcript_attempted is recorded to avoid repeated downloads
     clean_db.refresh(video_no_trans)

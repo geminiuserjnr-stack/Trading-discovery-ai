@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://127.0.0.1:6379/0"
 
     # YouTube API Configuration
-    YOUTUBE_API_KEY: str = "mock_api_key_for_now"
+    YOUTUBE_API_KEY: str = ""
 
     # Crawler Settings
     SCHEDULER_FREQUENCY: int = 30  # in minutes
