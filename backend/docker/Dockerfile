@@ -19,8 +19,6 @@ COPY docker/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Copy application files
-COPY .env /app/.env
 COPY app /app/backend/app
 COPY migrations /app/backend/migrations
 COPY alembic.ini /app/backend/alembic.ini
