@@ -12,7 +12,8 @@ from backend.app.models.models import ApiQuotaLog
 class YouTubeService:
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or settings.YOUTUBE_API_KEY
-        self.is_mock_mode = (self.api_key == "mock_api_key_for_now" or not self.api_key)
+        if not self.api_key or self.api_key == "mock_api_key_for_now":
+            raise ValueError("YouTube API Key is missing or invalid. Set YOUTUBE_API_KEY in the configuration or environment.")
         self.base_url = "https://www.googleapis.com/youtube/v3"
 
     def _log_quota_usage(self, cost: int):
@@ -66,10 +67,6 @@ class YouTubeService:
 
     def _make_request(self, endpoint: str, params: Dict[str, Any], cost: int, max_retries: int = 3) -> Dict[str, Any]:
         """Make YouTube v3 API request with retry backoff and quota tracking."""
-        if self.is_mock_mode:
-            self._log_quota_usage(cost)
-            return {}
-
         url = f"{self.base_url}/{endpoint}"
         params["key"] = self.api_key
 
@@ -103,10 +100,6 @@ class YouTubeService:
         """Search videos using YouTube API search.list (Cost: 100)."""
         cost = 100
 
-        if self.is_mock_mode:
-            self._log_quota_usage(cost)
-            return self._generate_mock_search_results(query, max_results, page_token)
-
         params = {
             "q": query,
             "part": "snippet",
@@ -123,10 +116,6 @@ class YouTubeService:
         """Get channel details via channels.list (Cost: 1)."""
         cost = 1
 
-        if self.is_mock_mode:
-            self._log_quota_usage(cost)
-            return self._generate_mock_channel_details(channel_id)
-
         params = {
             "id": channel_id,
             "part": "snippet,statistics,brandingSettings",
@@ -137,145 +126,8 @@ class YouTubeService:
         """Get video details via videos.list (Cost: 1)."""
         cost = 1
 
-        if self.is_mock_mode:
-            self._log_quota_usage(cost)
-            return self._generate_mock_video_details(video_id)
-
         params = {
             "id": video_id,
             "part": "snippet,statistics,contentDetails",
         }
         return self._make_request("videos", params, cost=cost)
-
-    # Mock Generators for Local/Testing Mode
-    def _generate_mock_search_results(self, query: str, max_results: int, page_token: Optional[str]) -> Dict[str, Any]:
-        """Generates realistic mock search responses containing German trading terms/videos."""
-        sys_logger.info(f"[MOCK MODE] Generating mock search results for query: '{query}'")
-
-        # Consistent mock videos based on some German trading seeds
-        mock_items = [
-            {
-                "id": {"videoId": "mock_vid_1"},
-                "snippet": {
-                    "title": "Trading lernen für Anfänger | Live DAX Analyse & Strategien",
-                    "description": "Erfahre wie du mit dem DAX Trading startest. Lerne Chartanalyse und Risikomanagement für erfolgreiches Trading im deutschen Markt.",
-                    "channelId": "mock_chan_1",
-                    "channelTitle": "German Trader Elite",
-                    "publishedAt": "2026-07-01T12:00:00Z"
-                }
-            },
-            {
-                "id": {"videoId": "mock_vid_2"},
-                "snippet": {
-                    "title": "Krypto Trading Strategie 2026 - So machst du Profite",
-                    "description": "Bitcoin und Ethereum Chartanalyse auf Deutsch. Schließe dich unserer Telegram-Community unter t.me/cryptotradingde an!",
-                    "channelId": "mock_chan_2",
-                    "channelTitle": "Crypto Insider DE",
-                    "publishedAt": "2026-07-02T15:30:00Z"
-                }
-            },
-            {
-                "id": {"videoId": "mock_vid_3"},
-                "snippet": {
-                    "title": "Aktien kaufen für Dividenden - Mein deutsches Depot Update",
-                    "description": "Heute besprechen wir die besten deutschen Aktien für Dividenden-Investoren. Mehr auf patreon.com/aktiencommunity.",
-                    "channelId": "mock_chan_3",
-                    "channelTitle": "Aktien mit Kopf & Verstand",
-                    "publishedAt": "2026-07-03T18:00:00Z"
-                }
-            }
-        ]
-
-        # Slice to max_results requested
-        items = mock_items[:max_results]
-
-        return {
-            "kind": "youtube#searchListResponse",
-            "nextPageToken": "mock_next_token_abc123" if not page_token else None,
-            "items": items
-        }
-
-    def _generate_mock_channel_details(self, channel_id: str) -> Dict[str, Any]:
-        """Generates realistic mock channel details based on ID."""
-        sys_logger.info(f"[MOCK MODE] Generating mock channel details for: {channel_id}")
-
-        names_map = {
-            "mock_chan_1": "German Trader Elite",
-            "mock_chan_2": "Crypto Insider DE",
-            "mock_chan_3": "Aktien mit Kopf & Verstand"
-        }
-        desc_map = {
-            "mock_chan_1": "Deutscher Kanal für Daytrading, Swingtrading und DAX Analysen. Tritt unserer Discord-Community bei: discord.gg/germantrader!",
-            "mock_chan_2": "Krypto Analysen, Hebel-Trading und Altcoin News für den deutschsprachigen Raum.",
-            "mock_chan_3": "Langfristiges Investieren in Aktien, ETFs und Dividenden-Werte. Besuche meine Webseite: https://aktien-mit-verstand.de"
-        }
-
-        name = names_map.get(channel_id, "Sample German Trading Channel")
-        desc = desc_map.get(channel_id, "Ein Kanal über Finanzen und Börse in Deutschland.")
-
-        return {
-            "items": [
-                {
-                    "id": channel_id,
-                    "snippet": {
-                        "title": name,
-                        "description": desc,
-                        "publishedAt": "2021-01-10T14:22:18Z",
-                        "country": "DE",
-                        "thumbnails": {
-                            "default": {"url": "https://example.com/avatar.jpg"},
-                            "high": {"url": "https://example.com/banner.jpg"}
-                        },
-                        "customUrl": f"@{channel_id}"
-                    },
-                    "statistics": {
-                        "subscriberCount": "25000",
-                        "videoCount": "320",
-                        "viewCount": "1250000"
-                    }
-                }
-            ]
-        }
-
-    def _generate_mock_video_details(self, video_id: str) -> Dict[str, Any]:
-        """Generates realistic mock video details based on ID."""
-        sys_logger.info(f"[MOCK MODE] Generating mock video details for: {video_id}")
-
-        titles_map = {
-            "mock_vid_1": "Trading lernen für Anfänger | Live DAX Analyse & Strategien",
-            "mock_vid_2": "Krypto Trading Strategie 2026 - So machst du Profite",
-            "mock_vid_3": "Aktien kaufen für Dividenden - Mein deutsches Depot Update"
-        }
-        channel_map = {
-            "mock_vid_1": "mock_chan_1",
-            "mock_vid_2": "mock_chan_2",
-            "mock_vid_3": "mock_chan_3"
-        }
-
-        title = titles_map.get(video_id, "Standard German Trading Video")
-        channel_id = channel_map.get(video_id, "mock_chan_1")
-
-        return {
-            "items": [
-                {
-                    "id": video_id,
-                    "snippet": {
-                        "title": title,
-                        "description": "Detaillierte Beschreibung des Videos mit nützlichen Links. Schließe dich unserem Skool-Netzwerk an: skool.com/tradingde",
-                        "publishedAt": "2026-07-01T12:00:00Z",
-                        "channelId": channel_id,
-                        "thumbnails": {
-                            "high": {"url": "https://example.com/thumbnail.jpg"}
-                        }
-                    },
-                    "statistics": {
-                        "viewCount": "4500",
-                        "likeCount": "230",
-                        "commentCount": "45"
-                    },
-                    "contentDetails": {
-                        "duration": "PT15M30S"  # 15 mins 30 secs
-                    }
-                }
-            ]
-        }

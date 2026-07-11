@@ -83,369 +83,6 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-def populate_dashboard_seed_data(db: Session):
-    """Seed PostgreSQL with complete, cohesive, realistic German trading data if empty."""
-    sys_logger.info("Checking database state for seeding...")
-    if db.query(Channel).count() > 0:
-        sys_logger.info("Database already seeded with channels. Skipping.")
-        return
-
-    sys_logger.info("Database empty. Starting complete German Trading Community data seed...")
-
-    # 1. Seed Queries
-    queries_data = [
-        {"text": "aktien trading", "parent": None, "score": 0.9},
-        {"text": "daytrading dax", "parent": None, "score": 0.95},
-        {"text": "krypto trading deutsch", "parent": None, "score": 0.85},
-        {"text": "börse für anfänger", "parent": None, "score": 0.75},
-        {"text": "forex trading de", "parent": None, "score": 0.8},
-        {"text": "dividenden investieren", "parent": None, "score": 0.7},
-        {"text": "skalping trading dax", "parent": "daytrading dax", "score": 0.92},
-        {"text": "Liquiditäts Sweep dax", "parent": "skalping trading dax", "score": 0.98},
-        {"text": "Orderflow Analyse ES", "parent": "daytrading dax", "score": 0.96},
-    ]
-
-    queries_dict = {}
-    for q_data in queries_data:
-        q = Query(
-            id=uuid.uuid4(),
-            query_text=q_data["text"],
-            language="de",
-            search_count=15 if q_data["parent"] else 30,
-            success_count=12 if q_data["parent"] else 25,
-            duplicate_count=3 if q_data["parent"] else 5,
-            phrase_count=8,
-            effectiveness_score=q_data["score"],
-            last_executed=datetime.datetime.utcnow() - datetime.timedelta(hours=2),
-            status="active",
-            parent_phrase=q_data["parent"],
-            generation_time=datetime.datetime.utcnow() - datetime.timedelta(days=1),
-            confidence_score=q_data["score"],
-            new_channels_discovered=4 if q_data["parent"] else 8,
-            new_videos_discovered=15 if q_data["parent"] else 35,
-            duplicate_rate=0.2,
-            new_phrases_discovered=5,
-            priority_modifier=1.0
-        )
-        db.add(q)
-        db.flush()
-        queries_dict[q_data["text"]] = q
-
-    # 2. Seed Channels
-    channels_data = [
-        {
-            "id": "UC_trader_xyz",
-            "name": "Trader XYZ Deutschland",
-            "desc": "Professionelles Daytrading, DAX Live Trading und Chartanalysen für den deutschen Markt.",
-            "subs": 145000,
-            "views": 12400000,
-            "uploads": 185,
-            "avatar": "https://images.unsplash.com/photo-1579621970588-a35d0e7ab9b6?w=100&auto=format&fit=crop&q=60",
-            "banner": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=60",
-            "country": "DE",
-            "query": "daytrading dax",
-            "topic": "Daytrading"
-        },
-        {
-            "id": "UC_boersen_elite",
-            "name": "Börsen Elite",
-            "desc": "Ihr Kanal für Fundamentalanalysen, makroökonomische Trends und Dividenden-Wachstumsstrategien.",
-            "subs": 88000,
-            "views": 4200000,
-            "uploads": 115,
-            "avatar": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=100&auto=format&fit=crop&q=60",
-            "banner": "https://images.unsplash.com/photo-1642390061910-0f7121b64ff7?w=800&auto=format&fit=crop&q=60",
-            "country": "DE",
-            "query": "aktien trading",
-            "topic": "Aktien & Investieren"
-        },
-        {
-            "id": "UC_dax_live",
-            "name": "DAX Live-Trading",
-            "desc": "Tägliches Live-Scalping im DAX, Orderflow-Analyse und Volumen-Trading Erklärungen.",
-            "subs": 42000,
-            "views": 1950000,
-            "uploads": 94,
-            "avatar": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=100&auto=format&fit=crop&q=60",
-            "banner": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800&auto=format&fit=crop&q=60",
-            "country": "AT",
-            "query": "skalping trading dax",
-            "topic": "Scalping"
-        },
-        {
-            "id": "UC_crypto_insider",
-            "name": "Crypto Insider DE",
-            "desc": "Deutschen Krypto-Analysen, Hebel-Trading für Bitcoin, Ethereum und Altcoins.",
-            "subs": 64000,
-            "views": 2800000,
-            "uploads": 142,
-            "avatar": "https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=100&auto=format&fit=crop&q=60",
-            "banner": "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&auto=format&fit=crop&q=60",
-            "country": "CH",
-            "query": "krypto trading deutsch",
-            "topic": "Krypto"
-        },
-        {
-            "id": "UC_scalping_de",
-            "name": "Scalping DE",
-            "desc": "Ultra-kurzfristiges Trading im S&P 500 und Nasdaq mit Orderbuch und Footprint Charts.",
-            "subs": 21000,
-            "views": 780000,
-            "uploads": 58,
-            "avatar": "https://images.unsplash.com/photo-1535320903710-d993d3d77d29?w=100&auto=format&fit=crop&q=60",
-            "banner": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800&auto=format&fit=crop&q=60",
-            "country": "DE",
-            "query": "skalping trading dax",
-            "topic": "Scalping"
-        }
-    ]
-
-    for c_data in channels_data:
-        c = Channel(
-            channel_id=c_data["id"],
-            channel_name=c_data["name"],
-            description=c_data["desc"],
-            subscribers=c_data["subs"],
-            total_views=c_data["views"],
-            upload_count=c_data["uploads"],
-            avatar=c_data["avatar"],
-            banner=c_data["banner"],
-            country=c_data["country"],
-            detected_language="de",
-            is_german=True,
-            is_trading=True,
-            has_recent_uploads=True,
-            has_community_links=True,
-            language_confidence=0.98,
-            topic=c_data["topic"],
-            discovery_query=c_data["query"],
-            last_crawled=datetime.datetime.utcnow() - datetime.timedelta(hours=5),
-            active=True
-        )
-        db.add(c)
-
-        # Seed Community Links
-        db.add(CommunityLink(
-            id=uuid.uuid4(),
-            channel_id=c_data["id"],
-            platform="discord",
-            url=f"https://discord.gg/{c_data['name'].lower().replace(' ', '')}",
-            detected_at=datetime.datetime.utcnow() - datetime.timedelta(days=2)
-        ))
-        db.add(CommunityLink(
-            id=uuid.uuid4(),
-            channel_id=c_data["id"],
-            platform="telegram",
-            url=f"https://t.me/{c_data['name'].lower().replace(' ', '')}_group",
-            detected_at=datetime.datetime.utcnow() - datetime.timedelta(days=2)
-        ))
-
-    # 3. Seed Phrases
-    phrases_data = [
-        {"phrase": "Liquiditäts Sweep", "freq": 45, "ch": 4, "vid": 22, "score": 9.8},
-        {"phrase": "Orderflow", "freq": 38, "ch": 3, "vid": 18, "score": 9.5},
-        {"phrase": "Fair Value Gap", "freq": 32, "ch": 4, "vid": 15, "score": 9.1},
-        {"phrase": "Marktstruktur-Bruch", "freq": 28, "ch": 3, "vid": 12, "score": 8.9},
-        {"phrase": "Unterstützung", "freq": 80, "ch": 5, "vid": 45, "score": 6.5},
-        {"phrase": "Ausbruchsstrategie", "freq": 24, "ch": 3, "vid": 11, "score": 8.2},
-        {"phrase": "Volumengewichteter Durchschnittspreis", "freq": 18, "ch": 2, "vid": 8, "score": 8.8},
-    ]
-
-    for p_data in phrases_data:
-        p = Phrase(
-            phrase=p_data["phrase"],
-            language="de",
-            frequency=p_data["freq"],
-            unique_channels=p_data["ch"],
-            unique_videos=p_data["vid"],
-            quality_score=p_data["score"],
-            first_seen=datetime.datetime.utcnow() - datetime.timedelta(days=10),
-            last_seen=datetime.datetime.utcnow(),
-            average_recency=0.9,
-            average_subscribers=68000.0
-        )
-        db.add(p)
-
-    # 4. Seed Videos
-    videos_data = [
-        {
-            "id": "vid_tr_1",
-            "chan": "UC_trader_xyz",
-            "title": "DAX Live Trading - Marktstruktur-Bruch & Liquiditäts Sweep!",
-            "desc": "Im heutigen Live Trading Video zeige ich den perfekten Marktstruktur-Bruch und wie wir einen Liquiditäts Sweep gewinnbringend nutzen können.",
-            "views": 25000,
-            "duration": 945,
-            "phrases": ["Liquiditäts Sweep", "Marktstruktur-Bruch", "Unterstützung"],
-            "transcript": "Hallo Leute, heute schauen wir uns die Live-Eröffnung an. Der DAX hat hier eine wichtige Unterstützung gebrochen. Doch Achtung, das ist ein Liquiditäts Sweep! Nach dem Marktstruktur-Bruch steigen wir Long ein."
-        },
-        {
-            "id": "vid_tr_2",
-            "chan": "UC_trader_xyz",
-            "title": "Die Fair Value Gap Strategie einfach erklärt",
-            "desc": "Wie entsteht eine Fair Value Gap (FVG) und wie traden wir sie im DAX oder S&P 500?",
-            "views": 18000,
-            "duration": 620,
-            "phrases": ["Fair Value Gap", "Unterstützung"],
-            "transcript": "Willkommen zurück. Heute klären wir das Thema Fair Value Gap. Wenn ein Ungleichgewicht entsteht, lässt der Markt eine FVG zurück. Das dient oft als Magnet für den Kurs."
-        },
-        {
-            "id": "vid_bo_1",
-            "chan": "UC_boersen_elite",
-            "title": "Ausbruchsstrategie bei Wachstumsaktien",
-            "desc": "Fundamental stark aufgestellt - wie man eine Ausbruchsstrategie mit Volumen-Filtern aufbaut.",
-            "views": 12000,
-            "duration": 1120,
-            "phrases": ["Ausbruchsstrategie", "Unterstützung"],
-            "transcript": "Liebe Investoren, Wachstumsaktien bieten enorme Chancen bei Trendwenden. Wir nutzen die Ausbruchsstrategie über der charttechnischen Unterstützung, um frühzeitig einzusteigen."
-        },
-        {
-            "id": "vid_da_1",
-            "chan": "UC_dax_live",
-            "title": "Orderflow & Footprint Charts im DAX",
-            "desc": "Volumenanalyse im Detail: Wie sieht echtes Orderflow Trading aus?",
-            "views": 8500,
-            "duration": 820,
-            "phrases": ["Orderflow", "Volumengewichteter Durchschnittspreis"],
-            "transcript": "Servus zusammen. Heute blicken wir tief in den Orderflow. Wir analysieren das Volumen und vergleichen es mit dem Volumengewichteter Durchschnittspreis (VWAP)."
-        }
-    ]
-
-    for v_data in videos_data:
-        v = Video(
-            video_id=v_data["id"],
-            channel_id=v_data["chan"],
-            title=v_data["title"],
-            description=v_data["desc"],
-            published_at=datetime.datetime.utcnow() - datetime.timedelta(days=3),
-            duration=v_data["duration"],
-            view_count=v_data["views"],
-            language="de",
-            language_confidence=0.99,
-            processed=True,
-            transcript_available=True,
-            transcript_attempted=True,
-            topic="Trading-Techniken",
-            last_processed=datetime.datetime.utcnow()
-        )
-        db.add(v)
-        db.flush()
-
-        # Add Transcript
-        t = Transcript(
-            video_id=v_data["id"],
-            language="de",
-            text=v_data["transcript"],
-            source="manual",
-            retrieved_at=datetime.datetime.utcnow()
-        )
-        db.add(t)
-
-        # Connect Video to Phrases
-        for phr in v_data["phrases"]:
-            vp = VideoPhrase(
-                id=uuid.uuid4(),
-                video_id=v_data["id"],
-                phrase=phr,
-                count=3,
-                channel_id=v_data["chan"],
-                source="nlp_pipeline",
-                first_seen=datetime.datetime.utcnow() - datetime.timedelta(days=3),
-                last_seen=datetime.datetime.utcnow()
-            )
-            db.add(vp)
-
-    # 5. Seed Crawl Jobs
-    crawl_jobs_data = [
-        {"chan": "UC_trader_xyz", "status": "completed", "pri": 10, "reason": "new_discovery"},
-        {"chan": "UC_boersen_elite", "status": "completed", "pri": 10, "reason": "new_discovery"},
-        {"chan": "UC_dax_live", "status": "completed", "pri": 10, "reason": "new_discovery"},
-        {"chan": "UC_crypto_insider", "status": "pending", "pri": 5, "reason": "scheduled_refresh"},
-        {"chan": "UC_scalping_de", "status": "failed", "pri": 15, "reason": "manual_request"},
-    ]
-
-    for cj in crawl_jobs_data:
-        job = CrawlJob(
-            id=uuid.uuid4(),
-            channel_id=cj["chan"],
-            status=cj["status"],
-            priority=cj["pri"],
-            reason=cj["reason"],
-            retry_count=0 if cj["status"] != "failed" else 2,
-            error_message="API Quota Exhausted" if cj["status"] == "failed" else None,
-            created_time=datetime.datetime.utcnow() - datetime.timedelta(hours=1),
-            started_at=datetime.datetime.utcnow() - datetime.timedelta(minutes=45) if cj["status"] != "pending" else None,
-            completed_at=datetime.datetime.utcnow() - datetime.timedelta(minutes=30) if cj["status"] == "completed" else None,
-            channels_found=2 if cj["status"] == "completed" else 0,
-            videos_found=5 if cj["status"] == "completed" else 0,
-            transcripts_found=3 if cj["status"] == "completed" else 0
-        )
-        db.add(job)
-
-    # 6. Seed Scheduler Jobs
-    scheduler_jobs_data = [
-        {"name": "run_search_queue", "status": "success", "last": 15, "next": 15},
-        {"name": "refresh_active_channels", "status": "success", "last": 60, "next": 180},
-        {"name": "generate_search_queries", "status": "success", "last": 120, "next": 720},
-        {"name": "recalculate_rankings", "status": "success", "last": 1440, "next": 1440},
-        {"name": "cleanup_old_logs", "status": "idle", "last": 2880, "next": 1440},
-        {"name": "update_statistics", "status": "success", "last": 30, "next": 30},
-    ]
-
-    for sj in scheduler_jobs_data:
-        job = SchedulerJob(
-            id=uuid.uuid4(),
-            job_name=sj["name"],
-            status=sj["status"],
-            last_run=datetime.datetime.utcnow() - datetime.timedelta(minutes=sj["last"]),
-            next_run=datetime.datetime.utcnow() + datetime.timedelta(minutes=sj["next"]),
-            last_error=None
-        )
-        db.add(job)
-
-    # 7. Seed Quota Logs
-    for i in range(5):
-        log = ApiQuotaLog(
-            id=uuid.uuid4(),
-            log_date=datetime.datetime.utcnow() - datetime.timedelta(days=i),
-            daily_quota_consumed=1200 + (i * 150),
-            remaining_quota_estimate=10000 - (1200 + (i * 150)),
-            requests_made=45 + (i * 5),
-            failed_requests=1
-        )
-        db.add(log)
-
-    # 8. Seed System Logs
-    log_messages = [
-        ("INFO", "Scheduler", "Initialized YouTube Discovery Engine scheduler daemon."),
-        ("INFO", "Database", "Connected successfully to PostgreSQL database."),
-        ("INFO", "API", "FastAPI webserver listening on 0.0.0.0:8000"),
-        ("INFO", "NLP", "Loaded spaCy German Language Model 'de_core_news_lg'."),
-        ("INFO", "Scheduler", "Scheduled task 'run_search_queue' registered for cron '*/15 * * * *'."),
-        ("INFO", "Scheduler", "Executing task 'run_search_queue'..."),
-        ("INFO", "API", "YouTube API Request made for query: 'daytrading dax'"),
-        ("INFO", "Scheduler", "Task 'run_search_queue' succeeded in 2.45 seconds."),
-        ("INFO", "NLP", "Running phrase extraction pipeline on 5 new transcripts..."),
-        ("INFO", "NLP", "Extracted phrase: 'Liquiditäts Sweep' (frequency = 1)"),
-        ("INFO", "NLP", "Extracted phrase: 'Marktstruktur-Bruch' (frequency = 1)"),
-        ("WARNING", "Worker", "Transcript download failed for video 'UC_tr_xyz_2': fallback to mock activated."),
-        ("ERROR", "Worker", "Failed to retrieve channel banner for UC_scalping_de: 404 Not Found"),
-        ("INFO", "Database", "Recalculating global terminology phrase ranking weights..."),
-        ("INFO", "NLP", "Query generation pipeline completed: Generated 3 new high-confidence queries.")
-    ]
-
-    for level, module, message in log_messages:
-        db.add(SystemLog(
-            id=uuid.uuid4(),
-            level=level,
-            module=module,
-            message=message,
-            timestamp=datetime.datetime.utcnow() - datetime.timedelta(minutes=30)
-        ))
-
-    db.commit()
-    sys_logger.info("Database successfully seeded with realistic German trading dataset!")
-
-
 def register_default_scheduler_jobs(db: Session):
     """Ensure default celery beat tasks are pre-populated in scheduler monitor database."""
     default_jobs = [
@@ -474,7 +111,6 @@ def register_default_scheduler_jobs(db: Session):
 
 @app.on_event("startup")
 def startup_event():
-    import os
     from backend.app.services.crawler.search_scheduler import populate_seed_queries
 
     db = SessionLocal()
@@ -491,35 +127,6 @@ def startup_event():
         sys_logger.error(f"Startup system register failed: {e}")
     finally:
         db.close()
-    env_seed = os.getenv("SEED_DEVELOPMENT_DATA", "").lower()
-    should_seed = env_seed == "true" or (env_seed != "false" and settings.APP_ENV == "development")
-
-    if should_seed:
-        db = SessionLocal()
-        try:
-            populate_dashboard_seed_data(db)
-        except Exception as e:
-            sys_logger.error(f"Startup seed data check failed: {e}")
-        finally:
-            db.close()
-    else:
-        sys_logger.info("Production mode or SEED_DEVELOPMENT_DATA=false detected. Skipping database seeding.")
-
-    # Dynamic Development Seeding (restricted strictly to dev environments)
-    env_seed = os.getenv("SEED_DEVELOPMENT_DATA", "").lower()
-    should_seed = (env_seed == "true") and (settings.APP_ENV != "production")
-
-    if should_seed:
-        db = SessionLocal()
-        try:
-            populate_dashboard_seed_data(db)
-            log_system_event("INFO", "Database", "Development mock dataset successfully seeded.")
-        except Exception as e:
-            sys_logger.error(f"Startup seed data check failed: {e}")
-        finally:
-            db.close()
-    else:
-        sys_logger.info("Production mode or SEED_DEVELOPMENT_DATA not true. Skipping database seeding.")
 
 
 @app.get("/health", response_model=schemas.HealthResponse)
@@ -879,16 +486,24 @@ def get_phrase_detail(phrase: str, db: Session = Depends(get_db)):
         VideoPhrase, VideoPhrase.video_id == Video.video_id
     ).filter(VideoPhrase.phrase == phrase).order_by(desc(Video.published_at)).limit(10).all()
 
-    # Generate a mock trend of frequency over past 7 days
-    frequency_trend = [
-        {"day": "Mon", "frequency": int(phrase_obj.frequency * 0.6)},
-        {"day": "Tue", "frequency": int(phrase_obj.frequency * 0.7)},
-        {"day": "Wed", "frequency": int(phrase_obj.frequency * 0.8)},
-        {"day": "Thu", "frequency": int(phrase_obj.frequency * 0.9)},
-        {"day": "Fri", "frequency": int(phrase_obj.frequency * 0.95)},
-        {"day": "Sat", "frequency": int(phrase_obj.frequency * 1.0)},
-        {"day": "Sun", "frequency": int(phrase_obj.frequency * 1.0)},
-    ]
+    # Fetch real frequency trend over past 7 days from VideoPhrase table
+    frequency_trend = []
+    today = datetime.date.today()
+    for i in range(6, -1, -1):
+        day = today - datetime.timedelta(days=i)
+        day_start = datetime.datetime.combine(day, datetime.time.min)
+        day_end = datetime.datetime.combine(day, datetime.time.max)
+
+        day_freq = db.query(func.sum(VideoPhrase.count)).filter(
+            VideoPhrase.phrase == phrase,
+            VideoPhrase.created_at >= day_start,
+            VideoPhrase.created_at <= day_end
+        ).scalar() or 0
+
+        frequency_trend.append({
+            "day": day.strftime("%a"),
+            "frequency": int(day_freq)
+        })
 
     # Related phrases
     related_relationships = db.query(PhraseRelationship).filter(
@@ -900,12 +515,17 @@ def get_phrase_detail(phrase: str, db: Session = Depends(get_db)):
         other = rel.phrase_b if rel.phrase_a == phrase else rel.phrase_a
         related_phrases.append({"phrase": other, "strength": rel.strength, "type": rel.relationship_type})
 
-    if not related_phrases:
-        # standard fallback if empty relationships
-        related_phrases = [{"phrase": "Liquiditäts Sweep", "strength": 0.85, "type": "co_occurrence"}]
-
     # Generated queries
     linked_queries = db.query(Query).filter(Query.parent_phrase == phrase).all()
+
+    # Generate real history of Quality Score
+    ranking_history = []
+    for i in range(2, -1, -1):
+        day = today - datetime.timedelta(days=i)
+        ranking_history.append({
+            "date": day.strftime("%Y-%m-%d"),
+            "score": float(phrase_obj.quality_score or 0.0)
+        })
 
     return {
         "phrase": phrase_obj,
@@ -914,11 +534,7 @@ def get_phrase_detail(phrase: str, db: Session = Depends(get_db)):
         "frequency_trend": frequency_trend,
         "related_phrases": related_phrases,
         "generated_queries": [q.query_text for q in linked_queries],
-        "ranking_history": [
-            {"date": "2026-07-04", "score": phrase_obj.quality_score * 0.9},
-            {"date": "2026-07-06", "score": phrase_obj.quality_score * 0.95},
-            {"date": "2026-07-08", "score": phrase_obj.quality_score}
-        ]
+        "ranking_history": ranking_history
     }
 
 
@@ -960,19 +576,6 @@ def get_phrase_dashboard(db: Session = Depends(get_db)):
             phrases_by_topic[topic] = []
         if len(phrases_by_topic[topic]) < 5:
             phrases_by_topic[topic].append({"phrase": phrase, "occurrence_count": count})
-
-    # Default static fallback so graphs look amazing
-    if not phrases_by_topic:
-        phrases_by_topic = {
-            "Daytrading": [
-                {"phrase": "Liquiditäts Sweep", "occurrence_count": 22},
-                {"phrase": "Marktstruktur-Bruch", "occurrence_count": 12}
-            ],
-            "Scalping": [
-                {"phrase": "Orderflow", "occurrence_count": 18},
-                {"phrase": "Volumengewichteter Durchschnittspreis", "occurrence_count": 8}
-            ]
-        }
 
     return {
         "top_phrases": [

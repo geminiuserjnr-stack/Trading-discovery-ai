@@ -58,6 +58,7 @@ export const DashboardHome: React.FC = () => {
   const channelsCount = stats?.total_channels ?? 0;
   const videosCount = stats?.total_videos ?? 0;
   const processedVideosCount = stats?.processed_videos ?? 0;
+  const transcriptsCount = stats?.transcripts_collected ?? 0;
   const phrasesCount = stats?.extracted_phrases ?? 0;
   const queriesCount = stats?.generated_queries ?? 0;
   const duplicateRate = stats?.duplicate_rate ?? 0.0;
@@ -116,7 +117,7 @@ export const DashboardHome: React.FC = () => {
         />
         <MetricCard
           title="Transcripts Collected"
-          value={processedVideosCount} // Same as processed videos for mock alignment
+          value={transcriptsCount}
           trend={{ text: "100% Cached", positive: true }}
           icon={Database}
           onClick={() => navigate('/videos')}

@@ -8,7 +8,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { WS_BASE_URL, API_BASE_URL } from '../config';
-import { WS_BASE_URL } from '../config';
 
 interface SidebarItem {
   name: string;
@@ -43,7 +42,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [wsConnected, setWsConnected] = useState(false);
 
-  // Mock connecting to backend WebSocket server for live updates
+  // Connect to backend WebSocket server for real-time live discovery updates
   useEffect(() => {
     // Attempt WebSocket connection
     const wsUrl = `${WS_BASE_URL}/ws/events`;
