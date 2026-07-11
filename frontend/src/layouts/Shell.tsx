@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { WS_BASE_URL } from '../config';
+import { WS_BASE_URL, API_BASE_URL } from '../config';
 
 interface SidebarItem {
   name: string;
@@ -102,22 +102,30 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       return;
     }
 
-    const query = searchQuery.toLowerCase();
-    // Simulate instant search on seeded structures
-    const mockDb = [
-      { type: 'channel', name: 'Trader XYZ Deutschland', desc: 'UC_trader_xyz' },
-      { type: 'channel', name: 'Börsen Elite', desc: 'UC_boersen_elite' },
-      { type: 'channel', name: 'DAX Live-Trading', desc: 'UC_dax_live' },
-      { type: 'video', name: 'DAX Live Trading - Marktstruktur-Bruch & Liquiditäts Sweep!', desc: 'vid_tr_1' },
-      { type: 'video', name: 'Die Fair Value Gap Strategie einfach erklärt', desc: 'vid_tr_2' },
-      { type: 'phrase', name: 'Liquiditäts Sweep', desc: 'phrase' },
-      { type: 'phrase', name: 'Orderflow', desc: 'phrase' },
-      { type: 'query', name: 'daytrading dax', desc: 'query' },
-      { type: 'community', name: 'Discord - Trader XYZ', desc: 'community' },
-    ];
+    const controller = new AbortController();
+    const fetchResults = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/search/global?q=${encodeURIComponent(searchQuery)}`, {
+          signal: controller.signal
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data);
+        }
+      } catch (err) {
+        // Ignore abort or network errors
+      }
+    };
 
-    const filtered = mockDb.filter(item => item.name.toLowerCase().includes(query)).slice(0, 5);
-    setSearchResults(filtered);
+    // Simple debounce of 150ms
+    const delayDebounce = setTimeout(() => {
+      fetchResults();
+    }, 150);
+
+    return () => {
+      clearTimeout(delayDebounce);
+      controller.abort();
+    };
   }, [searchQuery]);
 
   const handleSearchResultClick = (item: any) => {

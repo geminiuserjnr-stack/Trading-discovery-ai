@@ -1,8 +1,9 @@
+import datetime
 from redis import Redis
-from sqlalchemy import text
+from sqlalchemy import text, func
 from backend.app.config.settings import settings
 from backend.app.database.session import SessionLocal, get_db
-from backend.app.models.models import Channel, Video, Query, Phrase, SchedulerJob
+from backend.app.models.models import Channel, Video, Query, Phrase, SchedulerJob, Transcript, ApiQuotaLog
 from backend.app.services.logging.logger import sys_logger
 
 
@@ -40,10 +41,32 @@ def get_overall_stats() -> dict:
         processed_videos = db.query(Video).filter(Video.processed == True).count()  # noqa: E712
         extracted_phrases = db.query(Phrase).count()
         generated_queries = db.query(Query).count()
+        transcripts_collected = db.query(Transcript).count()
 
-        # Simple rates to prevent division by zero
+        # Dynamically calculate duplicate and success rates from query metrics
+        total_queries = db.query(Query).count()
         duplicate_rate = 0.0
         success_rate = 1.0
+
+        if total_queries > 0:
+            total_searches = db.query(func.sum(Query.search_count)).scalar() or 0
+            total_duplicates = db.query(func.sum(Query.duplicate_count)).scalar() or 0
+            total_success = db.query(func.sum(Query.success_count)).scalar() or 0
+
+            if total_searches > 0:
+                duplicate_rate = float(total_duplicates) / total_searches
+                success_rate = float(total_success) / total_searches
+
+        # Dynamically fetch API quota usage for today
+        today = datetime.date.today()
+        today_start = datetime.datetime.combine(today, datetime.time.min)
+        quota_log = db.query(ApiQuotaLog).filter(ApiQuotaLog.created_at >= today_start).first()
+        api_quota_remaining = 10000
+        if quota_log:
+            api_quota_remaining = max(0, 10000 - quota_log.daily_quota_consumed)
+
+        # Dynamic new channels today count
+        new_channels_today = db.query(Channel).filter(Channel.created_at >= today_start).count()
 
         # Fetch latest scheduler job status
         latest_job = db.query(SchedulerJob).order_by(SchedulerJob.updated_at.desc()).first()
@@ -65,11 +88,13 @@ def get_overall_stats() -> dict:
             "total_videos": total_videos,
             "german_channels": german_channels,
             "processed_videos": processed_videos,
+            "transcripts_collected": transcripts_collected,
             "extracted_phrases": extracted_phrases,
             "generated_queries": generated_queries,
+            "new_channels_today": new_channels_today,
             "duplicate_rate": duplicate_rate,
             "success_rate": success_rate,
-            "api_quota": 10000,  # Mock initial API quota
+            "api_quota": api_quota_remaining,
             "scheduler_status": scheduler_status,
             "latest_discoveries": discoveries
         }

@@ -3,19 +3,40 @@ import { useQuery } from '@tanstack/react-query';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from 'recharts';
 import { ShieldAlert } from 'lucide-react';
 import { LoadingSkeleton, ErrorState } from '../components/UI';
+import { API_BASE_URL } from '../config';
 
 export const Analytics: React.FC = () => {
   // Fetch API Quota usage history for the chart
   const { data: quotaHistory, isLoading: quotaLoading, error: quotaError } = useQuery<any[]>({
     queryKey: ['quota-usage'],
     queryFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/stats/quota');
+      const res = await fetch(`${API_BASE_URL}/stats/quota`);
       if (!res.ok) throw new Error('Failed to retrieve API Quota history');
       return res.json();
     }
   });
 
-  const discoveriesData = [
+  // Fetch discoveries and vocabulary growth history dynamically
+  const { data: historyData } = useQuery<any[]>({
+    queryKey: ['stats-history'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE_URL}/stats/history`);
+      if (!res.ok) throw new Error('Failed to retrieve discovery history');
+      return res.json();
+    }
+  });
+
+  // Fetch real duplication metrics
+  const { data: duplicatesData } = useQuery<any>({
+    queryKey: ['stats-duplicates'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE_URL}/stats/duplicates`);
+      if (!res.ok) throw new Error('Failed to retrieve duplication metrics');
+      return res.json();
+    }
+  });
+
+  const discoveriesData = historyData || [
     { date: '07/04', channels: 2, videos: 12 },
     { date: '07/05', channels: 4, videos: 18 },
     { date: '07/06', channels: 3, videos: 15 },
@@ -25,7 +46,7 @@ export const Analytics: React.FC = () => {
     { date: '07/10', channels: 10, videos: 38 },
   ];
 
-  const phraseGrowthData = [
+  const phraseGrowthData = historyData || [
     { date: '07/04', phrases: 12 },
     { date: '07/05', phrases: 16 },
     { date: '07/06', phrases: 19 },
@@ -34,6 +55,12 @@ export const Analytics: React.FC = () => {
     { date: '07/09', phrases: 32 },
     { date: '07/10', phrases: 38 },
   ];
+
+  // Dynamically calculate duplicate rate or use default if empty database
+  const totalInDb = (duplicatesData?.total_channels_in_db || 0) + (duplicatesData?.total_videos_in_db || 0);
+  const totalEncountered = (duplicatesData?.duplicate_channels_encountered || 0) + (duplicatesData?.duplicate_videos_encountered || 0);
+  const dupRatePercentage = totalInDb > 0 ? Math.round((totalEncountered / (totalInDb + totalEncountered)) * 100) : 20;
+  const savingsPercentage = 100 - dupRatePercentage;
 
   if (quotaError) {
     return <ErrorState message={(quotaError as Error).message} />;
@@ -136,11 +163,11 @@ export const Analytics: React.FC = () => {
           <div className="grid grid-cols-2 gap-6 w-full max-w-xs">
             <div className="p-3 bg-darkBg border border-darkBorder rounded">
               <span className="text-[10px] font-mono text-darkMuted">DUPLICATE RATE</span>
-              <span className="text-lg font-bold font-mono text-accentDanger block">20%</span>
+              <span className="text-lg font-bold font-mono text-accentDanger block">{dupRatePercentage}%</span>
             </div>
             <div className="p-3 bg-darkBg border border-darkBorder rounded">
               <span className="text-[10px] font-mono text-darkMuted">INGEST SAVINGS</span>
-              <span className="text-lg font-bold font-mono text-accentSuccess block">80%</span>
+              <span className="text-lg font-bold font-mono text-accentSuccess block">{savingsPercentage}%</span>
             </div>
           </div>
         </div>

@@ -15,3 +15,26 @@ logger.add(
 
 # Export the configured logger
 sys_logger = logger
+
+
+def log_system_event(level: str, module: str, message: str):
+    """Inserts a structured log into PostgreSQL database."""
+    from backend.app.database.session import SessionLocal
+    from backend.app.models.models import SystemLog
+    import datetime
+
+    db = SessionLocal()
+    try:
+        log_entry = SystemLog(
+            level=level.upper(),
+            module=module,
+            message=message,
+            timestamp=datetime.datetime.utcnow()
+        )
+        db.add(log_entry)
+        db.commit()
+    except Exception as e:
+        sys_logger.error(f"Failed to save system log to DB: {e}")
+        db.rollback()
+    finally:
+        db.close()

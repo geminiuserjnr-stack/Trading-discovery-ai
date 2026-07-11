@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Radio, Play, Pause, Layers, Search, Hash, Cpu, AlertCircle, Sparkles } from 'lucide-react';
-import { Button, StatusBadge } from '../components/UI';
+import { Button, StatusBadge, LoadingSkeleton } from '../components/UI';
+import { API_BASE_URL } from '../config';
 
 interface FeedEvent {
   id: string;
@@ -10,76 +12,36 @@ interface FeedEvent {
   message: string;
 }
 
-const INITIAL_EVENTS: FeedEvent[] = [
-  { id: '1', time: '14:16', type: 'channel_discovered', title: 'New Discoveries', message: 'Discovered 3 new German trading channels: UC_scalping_de, UC_crypto_insider, UC_dax_live' },
-  { id: '2', time: '14:12', type: 'phrase_extracted', title: 'Phrase Extracted', message: 'Liquiditäts Sweep' },
-  { id: '3', time: '14:08', type: 'transcript_collected', title: 'Transcript Collected', message: 'Video: vid_tr_1 (DAX Live Trading)' },
-  { id: '4', time: '14:05', type: 'query_generated', title: 'Generated Query', message: 'Orderflow Analyse ES' },
-  { id: '5', time: '14:02', type: 'channel_discovered', title: 'Found Channel', message: 'Trader XYZ Deutschland' },
-];
-
 export const DiscoveryFeed: React.FC = () => {
-  const [events, setEvents] = useState<FeedEvent[]>(INITIAL_EVENTS);
   const [isLive, setIsLive] = useState(true);
 
-  useEffect(() => {
-    if (!isLive) return;
+  // Fetch real database discovery feed events
+  const { data: eventsData, isLoading, refetch } = useQuery<FeedEvent[]>({
+    queryKey: ['discovery-feed-events'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE_URL}/discoveries/feed?limit=50`);
+      if (!res.ok) throw new Error('Failed to retrieve live discovery feed');
+      return res.json();
+    },
+    refetchInterval: isLive ? 4000 : undefined // Auto-poll every 4s for dynamic look in UI
+  });
 
-    // Simulate realtime incoming WebSocket discovery events every 8 seconds
-    const interval = setInterval(() => {
-      const now = new Date();
-      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  if (isLoading) {
+    return (
+      <div className="space-y-6 select-none h-full flex flex-col p-4">
+        <LoadingSkeleton />
+      </div>
+    );
+  }
 
-      const generatedEvents: FeedEvent[] = [
-        {
-          id: Math.random().toString(),
-          time: timeStr,
-          type: 'channel_discovered',
-          title: 'Found Channel',
-          message: 'Börsen Elite (Austria/Germany community)'
-        },
-        {
-          id: Math.random().toString(),
-          time: timeStr,
-          type: 'query_generated',
-          title: 'Generated Query',
-          message: 'Liquiditäts Sweep dax'
-        },
-        {
-          id: Math.random().toString(),
-          time: timeStr,
-          type: 'phrase_extracted',
-          title: 'Phrase Extracted',
-          message: 'Fair Value Gap'
-        },
-        {
-          id: Math.random().toString(),
-          time: timeStr,
-          type: 'transcript_collected',
-          title: 'Transcript Collected',
-          message: 'Video: vid_bo_1 (Ausbruchsstrategie)'
-        },
-        {
-          id: Math.random().toString(),
-          time: timeStr,
-          type: 'scheduler_completed',
-          title: 'Scheduler Run',
-          message: 'recalculate_rankings succeeded in 1.1s'
-        }
-      ];
-
-      const newEvent = generatedEvents[Math.floor(Math.random() * generatedEvents.length)];
-      setEvents((prev) => [newEvent, ...prev.slice(0, 49)]); // Keep last 50 events
-    }, 8000);
-
-    return () => clearInterval(interval);
-  }, [isLive]);
+  const events = eventsData || [];
 
   const handleClear = () => {
-    setEvents([]);
+    // Real clear not available, let's trigger reload
+    refetch();
   };
 
-  const getEventIcon = (type: FeedEvent['type']) => {
+  const getEventIcon = (type: string) => {
     switch (type) {
       case 'channel_discovered':
         return <Layers className="text-accentSuccess" size={14} />;

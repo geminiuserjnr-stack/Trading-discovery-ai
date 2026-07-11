@@ -6,7 +6,7 @@ from typing import Optional
 from backend.app.database.session import SessionLocal
 from backend.app.models.models import Channel, Video, CrawlJob, CommunityLink, Query
 from backend.app.services.youtube.youtube_service import YouTubeService
-from backend.app.services.utils.parsers import evaluate_channel_quality, extract_community_links
+from backend.app.services.utils.parsers import evaluate_channel_quality, extract_community_links, validate_discord_invite
 from backend.app.services.logging.logger import sys_logger
 
 
@@ -160,6 +160,12 @@ def process_channel_crawl_job(db: Session, job: CrawlJob) -> bool:
                 CommunityLink.url == link["url"]
             ).first()
             if not existing_link:
+                # If platform is Discord, validate first!
+                if link["platform"] == "discord":
+                    invite_details = validate_discord_invite(link["url"])
+                    if not invite_details:
+                        sys_logger.warning(f"Discarding invalid Discord invite link: {link['url']}")
+                        continue
                 comm_link = CommunityLink(
                     channel_id=channel.channel_id,
                     platform=link["platform"],
@@ -276,6 +282,12 @@ def process_channel_crawl_job(db: Session, job: CrawlJob) -> bool:
                         CommunityLink.url == lk["url"]
                     ).first()
                     if not existing_lk:
+                        # If platform is Discord, validate first!
+                        if lk["platform"] == "discord":
+                            invite_details = validate_discord_invite(lk["url"])
+                            if not invite_details:
+                                sys_logger.warning(f"Discarding invalid Discord invite link in video description: {lk['url']}")
+                                continue
                         comm_lk = CommunityLink(
                             channel_id=v_channel_id,
                             video_id=vid_id,
