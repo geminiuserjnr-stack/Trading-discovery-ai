@@ -6,6 +6,7 @@ import {
 import { Button, StatusBadge, SearchBox, LoadingSkeleton, ErrorState, EmptyState } from '../components/UI';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config';
 
 export const Queries: React.FC = () => {
   const queryClient = useQueryClient();
@@ -20,7 +21,7 @@ export const Queries: React.FC = () => {
   const { data: queries, isLoading: queriesLoading, error: queriesError, refetch: refetchQueries } = useQuery<any[]>({
     queryKey: ['queries'],
     queryFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/queries?limit=100');
+      const res = await fetch(`${API_BASE_URL}/queries?limit=100`);
       if (!res.ok) throw new Error('Failed to retrieve search queries');
       return res.json();
     }
@@ -30,7 +31,7 @@ export const Queries: React.FC = () => {
   const { data: dashboard } = useQuery<any>({
     queryKey: ['queries-dashboard'],
     queryFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/queries/dashboard');
+      const res = await fetch(`${API_BASE_URL}/queries/dashboard`);
       if (!res.ok) throw new Error('Failed to retrieve query dashboard data');
       return res.json();
     }
@@ -39,7 +40,7 @@ export const Queries: React.FC = () => {
   // Action Mutations
   const pauseMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/search/pause', { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/search/pause`, { method: 'POST' });
       return res.json();
     },
     onSuccess: (data) => {
@@ -50,7 +51,7 @@ export const Queries: React.FC = () => {
 
   const resumeMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/search/resume', { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/search/resume`, { method: 'POST' });
       return res.json();
     },
     onSuccess: (data) => {
@@ -61,7 +62,7 @@ export const Queries: React.FC = () => {
 
   const triggerSearchMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/search/start', { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/search/start`, { method: 'POST' });
       return res.json();
     },
     onSuccess: (data) => {
@@ -71,7 +72,7 @@ export const Queries: React.FC = () => {
 
   const triggerGeneratorMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('http://127.0.0.1:8000/generator/run', { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/generator/run`, { method: 'POST' });
       return res.json();
     },
     onSuccess: (data) => {
