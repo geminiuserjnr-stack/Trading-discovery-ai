@@ -1450,56 +1450,74 @@ def update_settings(payload: Dict[str, Any]):
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     sys_logger.info("Real-time Dashboard client connected via WebSockets.")
+    db = SessionLocal()
+    last_checked = datetime.datetime.utcnow() - datetime.timedelta(seconds=10)
     try:
-        # Pushes simulated and live events to the feed in near real-time
-        counter = 0
         while True:
             # Let's read from client occasionally to keep connection alive
-            # Wait up to 5 seconds. If no message, continue with feed stream.
             try:
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
-                # handle client-to-server messages if any
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=4.0)
             except asyncio.TimeoutError:
                 pass
 
-            # Periodically stream realistic live discovery events!
-            counter += 1
-            if counter % 2 == 0:
-                events = [
-                    {
-                        "type": "channel_discovered",
-                        "title": "Trader XYZ Deutschland",
-                        "message": "Discovered channel 'Trader XYZ Deutschland' in DAX trading category.",
-                        "timestamp": datetime.datetime.utcnow().isoformat()
-                    },
-                    {
-                        "type": "query_generated",
-                        "title": "Orderflow Analyse ES",
-                        "message": "Generated search query 'Orderflow Analyse ES' with 96% confidence score.",
-                        "timestamp": datetime.datetime.utcnow().isoformat()
-                    },
-                    {
-                        "type": "transcript_collected",
-                        "title": "Video abcd123",
-                        "message": "Successfully downloaded and parsed transcript for video abcd123.",
-                        "timestamp": datetime.datetime.utcnow().isoformat()
-                    },
-                    {
-                        "type": "phrase_extracted",
-                        "title": "Liquiditäts Sweep",
-                        "message": "Extracted terminology 'Liquiditäts Sweep' (frequency +1).",
-                        "timestamp": datetime.datetime.utcnow().isoformat()
-                    },
-                    {
-                        "type": "scheduler_completed",
-                        "title": "Query Generator",
-                        "message": "Successfully finished query generation schedule run.",
-                        "timestamp": datetime.datetime.utcnow().isoformat()
-                    }
-                ]
-                import random
-                await websocket.send_json(random.choice(events))
+            # Query real database for any new records since last_checked
+            new_events = []
+
+            # 1. New Channels
+            chans = db.query(Channel).filter(Channel.created_at > last_checked).all()
+            for c in chans:
+                new_events.append({
+                    "type": "channel_discovered",
+                    "title": "Channel Discovered",
+                    "message": f"Discovered German trading channel '{c.channel_name}' via query '{c.discovery_query or 'N/A'}'",
+                    "timestamp": c.created_at.isoformat()
+                })
+
+            # 2. New Videos
+            vids = db.query(Video).filter(Video.created_at > last_checked).all()
+            for v in vids:
+                new_events.append({
+                    "type": "transcript_collected",
+                    "title": "Video Processed",
+                    "message": f"Video '{v.title}' was processed and cached",
+                    "timestamp": v.created_at.isoformat()
+                })
+
+            # 3. New Queries
+            queries = db.query(Query).filter(Query.generation_time > last_checked).all()
+            for q in queries:
+                new_events.append({
+                    "type": "query_generated",
+                    "title": "Query Generated",
+                    "message": f"Generated search query '{q.query_text}' with effectiveness score: {q.effectiveness_score or 0.0}",
+                    "timestamp": q.generation_time.isoformat()
+                })
+
+            # 4. New Phrases
+            phrases = db.query(Phrase).filter(Phrase.first_seen > last_checked).all()
+            for p in phrases:
+                new_events.append({
+                    "type": "phrase_extracted",
+                    "title": "Phrase Extracted",
+                    "message": f"Extracted German trading terminology '{p.phrase}' with Quality Score {p.quality_score or 0.0}",
+                    "timestamp": p.first_seen.isoformat()
+                })
+
+            # Sort and send
+            if new_events:
+                # Update watermark to now
+                last_checked = datetime.datetime.utcnow()
+                for event in new_events:
+                    await websocket.send_json(event)
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         sys_logger.info("Real-time Dashboard client disconnected.")
+    except Exception as e:
+        sys_logger.error(f"Error in WebSocket session: {e}")
+        try:
+            manager.disconnect(websocket)
+        except:
+            pass
+    finally:
+        db.close()
