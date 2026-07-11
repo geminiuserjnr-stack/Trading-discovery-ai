@@ -47,7 +47,6 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     // Attempt WebSocket connection
     const wsUrl = `${WS_BASE_URL}/ws/events`;
     let socket: WebSocket | null = null;
-    let fallbackInterval: any = null;
 
     try {
       socket = new WebSocket(wsUrl);
@@ -75,23 +74,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       setWsConnected(false);
     }
 
-    // Polling fallback simulation for live feed events if socket closes
-    fallbackInterval = setInterval(() => {
-      if (!wsConnected) {
-        // Occasionally trigger notifications
-        const randomEvents = [
-          { message: 'Analyzed transcript for video UC_tr_xyz_1', title: 'NLP Pipeline' },
-          { message: 'Discovered new S&P 500 scalper channel', title: 'Deduplication' },
-          { message: 'API Quota remaining: 9850 units', title: 'Quota Warning' }
-        ];
-        const event = randomEvents[Math.floor(Math.random() * randomEvents.length)];
-        addToast(event.message, 'info', event.title);
-      }
-    }, 15000);
-
     return () => {
       if (socket) socket.close();
-      if (fallbackInterval) clearInterval(fallbackInterval);
     };
   }, [wsConnected, addToast]);
 

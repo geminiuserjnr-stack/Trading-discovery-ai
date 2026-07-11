@@ -33,6 +33,17 @@ export const DashboardHome: React.FC = () => {
     refetchInterval: 10000
   });
 
+  // Fetch real database discovery feed events
+  const { data: feedData } = useQuery<any[]>({
+    queryKey: ['dashboard-feed-events'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE_URL}/discoveries/feed?limit=5`);
+      if (!res.ok) throw new Error('Failed to retrieve live discovery feed');
+      return res.json();
+    },
+    refetchInterval: 5000 // Poll every 5 seconds for real-time overview updates
+  });
+
   if (statsError || healthError) {
     return (
       <ErrorState
@@ -218,7 +229,7 @@ export const DashboardHome: React.FC = () => {
           </div>
         </div>
 
-        {/* Discovery Feed Sample */}
+        {/* Discovery Feed Live Data */}
         <div className="bg-darkCard border border-darkBorder rounded p-4 flex flex-col justify-between shadow-subtle">
           <div className="flex items-center justify-between border-b border-darkBorder pb-2.5 mb-3">
             <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-accentPrimary">
@@ -232,30 +243,26 @@ export const DashboardHome: React.FC = () => {
             </span>
           </div>
           <div className="space-y-3 overflow-y-auto max-h-60">
-            <div className="text-xs flex gap-2 items-start border-l-2 border-accentSuccess pl-2 py-0.5">
-              <span className="text-[10px] font-mono text-darkMuted">14:02</span>
-              <div>
-                <span className="text-darkMuted">Found channel</span> &rarr; <span className="text-darkText font-bold">Trader XYZ Deutschland</span>
-              </div>
-            </div>
-            <div className="text-xs flex gap-2 items-start border-l-2 border-accentPrimary pl-2 py-0.5">
-              <span className="text-[10px] font-mono text-darkMuted">14:05</span>
-              <div>
-                <span className="text-darkMuted">Generated query</span> &rarr; <span className="text-darkText font-bold">Orderflow Analyse ES</span>
-              </div>
-            </div>
-            <div className="text-xs flex gap-2 items-start border-l-2 border-accentSuccess pl-2 py-0.5">
-              <span className="text-[10px] font-mono text-darkMuted">14:08</span>
-              <div>
-                <span className="text-darkMuted">Transcript collected</span> &rarr; <span className="text-darkText font-bold">Video vid_tr_1</span>
-              </div>
-            </div>
-            <div className="text-xs flex gap-2 items-start border-l-2 border-accentWarning pl-2 py-0.5">
-              <span className="text-[10px] font-mono text-darkMuted">14:12</span>
-              <div>
-                <span className="text-darkMuted">Phrase extracted</span> &rarr; <span className="text-darkText font-bold">Liquiditäts Sweep</span>
-              </div>
-            </div>
+            {feedData?.map((evt: any) => {
+              const borderColors: Record<string, string> = {
+                channel_discovered: 'border-accentSuccess',
+                query_generated: 'border-accentPrimary',
+                transcript_collected: 'border-accentPrimary',
+                phrase_extracted: 'border-accentWarning',
+              };
+              const bColor = borderColors[evt.type] || 'border-darkMuted';
+              return (
+                <div key={evt.id} className={`text-xs flex gap-2 items-start border-l-2 ${bColor} pl-2 py-0.5`}>
+                  <span className="text-[10px] font-mono text-darkMuted">{evt.time}</span>
+                  <div>
+                    <span className="text-darkMuted">{evt.title}</span> &rarr; <span className="text-darkText font-bold">{evt.message}</span>
+                  </div>
+                </div>
+              );
+            })}
+            {(!feedData || feedData.length === 0) && (
+              <p className="text-xs text-darkMuted text-center py-4">No active discoveries recorded.</p>
+            )}
           </div>
         </div>
       </div>
