@@ -168,7 +168,7 @@ def list_communities(db: Session = Depends(get_db)):
     results = []
     for link, channel in query_results:
         channel_name = channel.channel_name if channel else "Unknown Channel"
-                        results.append({
+        results.append({
             "id": str(link.id),
             "name": f"{channel_name} Discord Server",
             "channel": channel_name,
