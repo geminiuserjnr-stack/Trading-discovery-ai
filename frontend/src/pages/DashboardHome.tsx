@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Tv, Cpu, Calendar, Activity, Radio, Share2, Database, ShieldAlert, ExternalLink
 } from 'lucide-react';
-import { MetricCard, LoadingSkeleton, ErrorState, StatusBadge, Button } from '../components/UI';
+import { MetricCard, LoadingSkeleton, ErrorState, StatusBadge } from '../components/UI';
 import { API_BASE_URL } from '../config';
 
 export const DashboardHome: React.FC = () => {
