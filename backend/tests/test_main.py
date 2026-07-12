@@ -62,16 +62,12 @@ def test_stats_endpoint():
     assert response.status_code == 200
     data = response.json()
     assert "total_channels" in data
-    assert "total_videos" in data
-    assert "german_channels" in data
-    assert "processed_videos" in data
-    assert "extracted_phrases" in data
-    assert "generated_queries" in data
-    assert "duplicate_rate" in data
-    assert "success_rate" in data
+    assert "discord_communities_count" in data
+    assert "discord_coverage_percentage" in data
+    assert "new_channels_today" in data
     assert "api_quota" in data
     assert "scheduler_status" in data
-    assert "latest_discoveries" in data
+    assert "latest_discords" in data
 
 
 def test_queries_endpoint():

@@ -2,10 +2,9 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Tv, PlaySquare, Hash, Search, Database, Cpu, Calendar, Activity,
-  BarChart2, Radio, ShieldAlert
+  Tv, Cpu, Calendar, Activity, Radio, Share2, Database, ShieldAlert, ExternalLink
 } from 'lucide-react';
-import { MetricCard, LoadingSkeleton, ErrorState, StatusBadge } from '../components/UI';
+import { MetricCard, LoadingSkeleton, ErrorState, StatusBadge, Button } from '../components/UI';
 import { API_BASE_URL } from '../config';
 
 export const DashboardHome: React.FC = () => {
@@ -67,13 +66,10 @@ export const DashboardHome: React.FC = () => {
 
   // Pre-calculate derived metric displays
   const channelsCount = stats?.total_channels ?? 0;
-  const videosCount = stats?.total_videos ?? 0;
-  const processedVideosCount = stats?.processed_videos ?? 0;
-  const transcriptsCount = stats?.transcripts_collected ?? 0;
-  const phrasesCount = stats?.extracted_phrases ?? 0;
-  const queriesCount = stats?.generated_queries ?? 0;
-  const duplicateRate = stats?.duplicate_rate ?? 0.0;
-  const apiQuotaRemaining = health?.api_quota_remaining ?? 10000;
+  const newChannelsToday = stats?.new_channels_today ?? 0;
+  const discordCommunitiesCount = stats?.discord_communities_count ?? 0;
+  const discordCoveragePercentage = stats?.discord_coverage_percentage ?? 0.0;
+  const apiQuotaRemaining = stats?.api_quota ?? 10000;
 
   return (
     <div className="space-y-6 select-none">
@@ -81,10 +77,10 @@ export const DashboardHome: React.FC = () => {
       <div className="flex items-center justify-between border-b border-darkBorder pb-4">
         <div>
           <h1 className="text-lg font-bold uppercase font-mono tracking-widest text-accentPrimary">
-            REALTIME DISCOVERY OVERVIEW
+            COMMUNITY DISCOVERY DASHBOARD
           </h1>
           <p className="text-xs text-darkMuted mt-0.5">
-            German Trading Community Youtube Intelligence Terminal
+            Autonomous Discovery Engine for German Trading Communities
           </p>
         </div>
         <div className="flex gap-2">
@@ -94,137 +90,128 @@ export const DashboardHome: React.FC = () => {
         </div>
       </div>
 
-      {/* Grid of 13 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {/* Grid of 9 Refocused Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
         <MetricCard
-          title="Total Channels"
+          title="Total Channels Discovered"
           value={channelsCount}
-          trend={{ text: `+${stats?.german_channels || 0} de`, positive: true }}
+          trend={{ text: "ACTIVE MONITORING", positive: true }}
           icon={Tv}
           onClick={() => navigate('/channels')}
           sparkline={[12, 14, 18, 24, 25, 30, channelsCount]}
         />
         <MetricCard
           title="New Channels Today"
-          value={stats?.german_channels ? Math.round(stats.german_channels / 2) : 2}
-          trend={{ text: "ACTIVE", positive: true }}
+          value={newChannelsToday}
+          trend={{ text: "DISCOVERY STREAM", positive: true }}
           icon={Radio}
           onClick={() => navigate('/feed')}
         />
         <MetricCard
-          title="Total Videos"
-          value={videosCount}
-          trend={{ text: "Scraped", positive: true }}
-          icon={PlaySquare}
-          onClick={() => navigate('/videos')}
-          sparkline={[50, 70, 95, 120, 150, 175, videosCount]}
+          title="Discord Communities Found"
+          value={discordCommunitiesCount}
+          trend={{ text: "VERIFIED INVITES", positive: true }}
+          icon={Share2}
+          onClick={() => navigate('/communities')}
+          sparkline={[2, 4, 6, 8, 9, 12, discordCommunitiesCount]}
         />
         <MetricCard
-          title="Processed Videos"
-          value={processedVideosCount}
-          trend={{ text: `${Math.round((processedVideosCount / (videosCount || 1)) * 100)}% Complete`, positive: true }}
-          icon={BarChart2}
-          onClick={() => navigate('/videos')}
-        />
-        <MetricCard
-          title="Transcripts Collected"
-          value={transcriptsCount}
-          trend={{ text: "100% Cached", positive: true }}
-          icon={Database}
-          onClick={() => navigate('/videos')}
-        />
-        <MetricCard
-          title="Extracted Phrases"
-          value={phrasesCount}
-          trend={{ text: "German terms", positive: true }}
-          icon={Hash}
-          onClick={() => navigate('/phrases')}
-          sparkline={[5, 12, 19, 23, 28, 32, phrasesCount]}
-        />
-        <MetricCard
-          title="Generated Queries"
-          value={queriesCount}
-          trend={{ text: "Active Seed", positive: true }}
-          icon={Search}
-          onClick={() => navigate('/queries')}
-        />
-        <MetricCard
-          title="Duplicate Rate"
-          value={`${Math.round(duplicateRate * 100)}%`}
-          trend={{ text: "Optimized", positive: true }}
+          title="Discord Coverage %"
+          value={`${discordCoveragePercentage.toFixed(1)}%`}
+          trend={{ text: "CONVERSION COEFFICIENT", positive: true }}
           icon={ShieldAlert}
-          onClick={() => navigate('/analytics')}
+          onClick={() => navigate('/communities')}
         />
         <MetricCard
           title="API Quota Remaining"
           value={`${apiQuotaRemaining} / 10000`}
-          trend={{ text: "SAFE LIMIT", positive: true }}
+          trend={{ text: "DAILY ROTATION SAFE", positive: true }}
           icon={Activity}
-          onClick={() => navigate('/analytics')}
+          onClick={() => navigate('/monitoring')}
         />
         <MetricCard
           title="Worker Status"
           value={health?.celery === 'healthy' ? "ONLINE" : "OFFLINE"}
-          trend={{ text: "2 Workers active", positive: health?.celery === 'healthy' }}
+          trend={{ text: "Active task listeners", positive: health?.celery === 'healthy' }}
           icon={Cpu}
           onClick={() => navigate('/workers')}
         />
         <MetricCard
           title="Scheduler Status"
           value={stats?.scheduler_status ? stats.scheduler_status.toUpperCase() : "ACTIVE"}
-          trend={{ text: "Beat enabled", positive: true }}
+          trend={{ text: "Beat triggers enabled", positive: true }}
           icon={Calendar}
           onClick={() => navigate('/scheduler')}
         />
         <MetricCard
           title="Database Status"
           value={health?.database === 'healthy' ? "HEALTHY" : "ERROR"}
-          trend={{ text: "Postgres 15", positive: health?.database === 'healthy' }}
+          trend={{ text: "PostgreSQL relational node", positive: health?.database === 'healthy' }}
           icon={Database}
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/monitoring')}
         />
         <MetricCard
           title="Redis Status"
           value={health?.redis === 'healthy' ? "HEALTHY" : "ERROR"}
-          trend={{ text: "Broker & Cache", positive: health?.redis === 'healthy' }}
+          trend={{ text: "Distributed broker cache", positive: health?.redis === 'healthy' }}
           icon={Cpu}
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/monitoring')}
         />
       </div>
 
-      {/* Details Row: Latest Discoveries & Recent Queries */}
+      {/* Details Row: Latest Verified Discord Communities & Recent Queries */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        {/* Latest Discoveries */}
+        {/* Latest Discord Communities */}
         <div className="bg-darkCard border border-darkBorder rounded p-4 flex flex-col justify-between shadow-subtle">
           <div className="flex items-center justify-between border-b border-darkBorder pb-2.5 mb-3">
             <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-accentPrimary">
-              Latest Channels Discovered
+              Latest Discord Communities Found
             </h3>
-            <span className="text-[10px] text-darkMuted font-mono">NEAR REALTIME</span>
+            <span className="text-[10px] text-darkMuted font-mono uppercase">Verified Invites Only</span>
           </div>
-          <div className="space-y-2 overflow-y-auto max-h-60">
-            {stats?.latest_discoveries?.map((ch: any) => (
+          <div className="space-y-2.5 overflow-y-auto max-h-60">
+            {stats?.latest_discords?.map((c: any) => (
               <div
-                key={ch.channel_id}
-                onClick={() => navigate(`/channels?id=${ch.channel_id}`)}
-                className="flex items-center justify-between p-2 rounded bg-darkBg hover:bg-darkBorder/40 border border-darkBorder/60 cursor-pointer transition-colors"
+                key={c.id}
+                className="flex items-center justify-between p-2.5 rounded bg-darkBg border border-darkBorder/60 hover:border-darkBorder transition-colors"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-accentPrimary/10 border border-accentPrimary/30 flex items-center justify-center text-[10px] font-bold text-accentPrimary">
-                    {ch.channel_name.charAt(0)}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {c.avatar ? (
+                    <img src={c.avatar} alt="Avatar" className="w-6 h-6 rounded-full border border-darkBorder" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-accentPrimary/10 border border-accentPrimary/30 flex items-center justify-center text-[10px] font-bold text-accentPrimary uppercase">
+                      {c.channel_name.charAt(0)}
+                    </div>
+                  )}
+                  <div className="flex flex-col min-w-0">
+                    <a
+                      href={`https://youtube.com/channel/${c.channel_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-darkText font-semibold hover:text-accentPrimary truncate hover:underline"
+                    >
+                      {c.channel_name}
+                    </a>
+                    <span className="text-[9px] text-darkMuted font-mono">
+                      {c.detected_at ? new Date(c.detected_at).toLocaleDateString() : 'Just now'}
+                    </span>
                   </div>
-                  <span className="text-xs text-darkText font-semibold">{ch.channel_name}</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] text-darkMuted font-mono">
-                    {ch.subscribers ? `${Math.round(ch.subscribers / 1000)}k subs` : '0 subs'}
-                  </span>
-                  <StatusBadge status="ACTIVE" type="success" />
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={c.discord_type.toUpperCase()} type={c.discord_type === 'paid' ? 'warning' : 'success'} />
+                  <a
+                    href={c.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-accentPrimary hover:underline px-2 py-1 bg-accentPrimary/10 border border-accentPrimary/25 rounded"
+                  >
+                    Join <ExternalLink size={10} />
+                  </a>
                 </div>
               </div>
             ))}
-            {(!stats?.latest_discoveries || stats.latest_discoveries.length === 0) && (
-              <p className="text-xs text-darkMuted text-center py-4">No active discoveries recorded.</p>
+            {(!stats?.latest_discords || stats.latest_discords.length === 0) && (
+              <p className="text-xs text-darkMuted text-center py-6 font-mono uppercase tracking-wide">No Discord communities discovered yet.</p>
             )}
           </div>
         </div>
