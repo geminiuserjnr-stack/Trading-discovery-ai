@@ -7,6 +7,7 @@ from backend.app.models.models import Channel, Video, Query, Phrase, SchedulerJo
 from backend.app.services.logging.logger import sys_logger
 
 
+
 def check_db_health() -> str:
     """Check synchronous DB connection health."""
     db = SessionLocal()
@@ -43,16 +44,19 @@ def get_overall_stats() -> dict:
         generated_queries = db.query(Query).count()
         transcripts_collected = db.query(Transcript).count()
 
-        # Calculate verified Discord communities count dynamically
+        # Calculate Discord coverage using unique channels with Discord links
         from backend.app.models.models import CommunityLink
-        discord_communities_count = db.query(CommunityLink).filter(CommunityLink.platform == "discord").count()
+        discord_channels_count = db.query(Channel.channel_id).join(
+            CommunityLink,
+            Channel.channel_id == CommunityLink.channel_id
+        ).filter(
+            CommunityLink.platform == "discord"
+        ).distinct().count()
 
-        # Calculate coverage %
         discord_coverage_percentage = 0.0
         if total_channels > 0:
-            discord_coverage_percentage = (discord_communities_count / total_channels) * 100.0
+            discord_coverage_percentage = (discord_channels_count / total_channels) * 100.0
 
-        # Dynamically calculate duplicate and success rates from query metrics
         total_queries = db.query(Query).count()
         duplicate_rate = 0.0
         success_rate = 1.0
@@ -66,7 +70,6 @@ def get_overall_stats() -> dict:
                 duplicate_rate = float(total_duplicates) / total_searches
                 success_rate = float(total_success) / total_searches
 
-        # Dynamically fetch API quota usage for today
         today = datetime.date.today()
         today_start = datetime.datetime.combine(today, datetime.time.min)
         quota_log = db.query(ApiQuotaLog).filter(ApiQuotaLog.created_at >= today_start).first()
@@ -74,14 +77,11 @@ def get_overall_stats() -> dict:
         if quota_log:
             api_quota_remaining = max(0, 10000 - quota_log.daily_quota_consumed)
 
-        # Dynamic new channels today count
         new_channels_today = db.query(Channel).filter(Channel.created_at >= today_start).count()
 
-        # Fetch latest scheduler job status
         latest_job = db.query(SchedulerJob).order_by(SchedulerJob.updated_at.desc()).first()
         scheduler_status = latest_job.status if latest_job else "idle"
 
-        # Fetch latest verified Discord communities by joining CommunityLink with Channel
         latest_discords = []
         links = db.query(CommunityLink).filter(CommunityLink.platform == "discord").order_by(CommunityLink.detected_at.desc()).limit(5).all()
         for link in links:
@@ -100,7 +100,7 @@ def get_overall_stats() -> dict:
 
         return {
             "total_channels": total_channels,
-            "discord_communities_count": discord_communities_count,
+            "discord_communities_count": discord_channels_count,
             "discord_coverage_percentage": discord_coverage_percentage,
             "new_channels_today": new_channels_today,
             "api_quota": api_quota_remaining,
