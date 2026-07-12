@@ -70,6 +70,11 @@ class ChannelBase(BaseModel):
     discovery_query: Optional[str] = None
     active: bool = True
 
+    # Phase 2A Community Discovery fields
+    discord_status: Optional[str] = "none"
+    discord_type: Optional[str] = "unknown"
+    discord_source: Optional[str] = "unknown"
+
 
 class ChannelCreate(ChannelBase):
     pass

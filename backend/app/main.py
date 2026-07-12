@@ -305,6 +305,9 @@ def list_channels(
     skip: int = 0,
     limit: int = 100,
     german_only: bool = False,
+    discord_status: Optional[str] = None,
+    discord_type: Optional[str] = None,
+    discord_source: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """GET /channels - lists discovered YouTube channels."""
@@ -312,6 +315,12 @@ def list_channels(
     query = db.query(Channel)
     if german_only:
         query = query.filter(Channel.is_german == True)  # noqa: E712
+    if discord_status:
+        query = query.filter(Channel.discord_status == discord_status)
+    if discord_type:
+        query = query.filter(Channel.discord_type == discord_type)
+    if discord_source:
+        query = query.filter(Channel.discord_source == discord_source)
     channels = query.offset(skip).limit(limit).all()
     return channels
 
