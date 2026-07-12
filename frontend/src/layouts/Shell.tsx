@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
-  LayoutDashboard, Tv, PlaySquare, Hash, Search, Radio, Share2,
-  Activity, Percent, LineChart, Calendar, Cpu, Terminal, Settings,
+  LayoutDashboard, Tv, Search, Radio, Share2,
+  Activity, Percent, Calendar, Cpu, Terminal, Settings,
   LogOut, User, ChevronLeft, ChevronRight, Search as SearchIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -18,14 +18,11 @@ interface SidebarItem {
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
   { name: 'Channels', path: '/channels', icon: Tv },
-  { name: 'Videos', path: '/videos', icon: PlaySquare },
-  { name: 'Phrases', path: '/phrases', icon: Hash },
   { name: 'Queries', path: '/queries', icon: Search },
   { name: 'Discovery Feed', path: '/feed', icon: Radio },
   { name: 'Communities', path: '/communities', icon: Share2 },
   { name: 'Monitoring', path: '/monitoring', icon: Activity },
   { name: 'Scoring', path: '/scoring', icon: Percent },
-  { name: 'Analytics', path: '/analytics', icon: LineChart },
   { name: 'Scheduler', path: '/scheduler', icon: Calendar },
   { name: 'Workers', path: '/workers', icon: Cpu },
   { name: 'Logs', path: '/logs', icon: Terminal },

@@ -15,10 +15,10 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const baseStyle = "font-mono font-bold uppercase tracking-wider rounded transition-colors focus:outline-none flex items-center justify-center gap-2";
   const variants = {
-    primary: "bg-accentPrimary text-darkBg hover:bg-accentPrimary/90",
+    primary: "bg-accentPrimary text-white hover:bg-accentPrimary/90",
     secondary: "bg-darkBorder text-darkText hover:bg-darkBorder/80",
-    danger: "bg-accentDanger text-darkText hover:bg-accentDanger/90",
-    success: "bg-accentSuccess text-darkBg hover:bg-accentSuccess/90",
+    danger: "bg-accentDanger text-white hover:bg-accentDanger/90",
+    success: "bg-accentSuccess text-white hover:bg-accentSuccess/90",
     outline: "border border-darkBorder hover:bg-darkBorder/40 text-darkText",
   };
   const sizes = {
