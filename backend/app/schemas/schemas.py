@@ -28,6 +28,8 @@ class QueryBase(BaseModel):
     query_text: str
     language: str = "de"
     status: str = "active"
+    country: Optional[str] = None
+    generation_source: Optional[str] = None
 
 
 class QueryCreate(QueryBase):
@@ -41,6 +43,9 @@ class QueryResponse(QueryBase):
     duplicate_count: int
     phrase_count: int
     effectiveness_score: float
+    channels_discovered: Optional[int] = 0
+    discords_found: Optional[int] = 0
+    success_rate: Optional[float] = 0.0
     last_executed: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
@@ -66,10 +71,13 @@ class ChannelBase(BaseModel):
     discovery_query: Optional[str] = None
     active: bool = True
 
-    # Phase 2A Community Discovery fields
+    # Trading Community Discovery fields
+    investigation_status: Optional[str] = "pending"
     discord_status: Optional[str] = "none"
     discord_type: Optional[str] = "unknown"
     discord_source: Optional[str] = "unknown"
+    confidence_score: Optional[float] = 0.0
+    last_investigated: Optional[datetime] = None
     discord_url: Optional[str] = None
 
 
@@ -162,3 +170,43 @@ class SearchResponse(BaseModel):
 class ActionRunResponse(BaseModel):
     status: str
     message: str
+
+
+
+class DiscordLinkBase(BaseModel):
+    channel_id: str
+    invite_url: str
+    source: Optional[str] = None
+    verification_status: str = "pending"
+    discord_type: str = "unknown"
+
+
+class DiscordLinkCreate(DiscordLinkBase):
+    pass
+
+
+class DiscordLinkResponse(DiscordLinkBase):
+    id: UUID4
+    created_at: datetime
+    verified_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChannelInvestigationBase(BaseModel):
+    channel_id: str
+    status: str = "pending"
+    sources_checked: Optional[str] = None
+    discord_found: bool = False
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
+class ChannelInvestigationCreate(ChannelInvestigationBase):
+    pass
+
+
+class ChannelInvestigationResponse(ChannelInvestigationBase):
+    id: UUID4
+
+    model_config = ConfigDict(from_attributes=True)
