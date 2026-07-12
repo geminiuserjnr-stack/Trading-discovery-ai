@@ -3,8 +3,8 @@ import uuid
 import json
 import datetime
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, Depends, HTTPException, Query as FastAPIQuery, WebSocket, WebSocketDisconnect
-from sqlalchemy import desc, func, text, and_
+from fastapi import FastAPI, Depends, HTTPException, Query as FastAPIQuery, WebSocket, WebSocketDisconnect, Response
+from sqlalchemy import desc, func, text
 from sqlalchemy.orm import Session
 
 from backend.app.config.settings import settings
@@ -301,47 +301,78 @@ def get_discovery_feed(limit: int = 50, db: Session = Depends(get_db)):
 
 @app.get("/channels", response_model=List[schemas.ChannelResponse])
 def list_channels(
+    response: Response,
     skip: int = 0,
     limit: int = 100,
     german_only: bool = False,
     discord_status: Optional[str] = None,
     discord_type: Optional[str] = None,
     discord_source: Optional[str] = None,
-    sort_by: Optional[str] = "created_at",
-    sort_order: Optional[str] = "desc",
+    search: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    sort_order: Optional[str] = "asc",
+    country: Optional[str] = None,
+    detected_language: Optional[str] = None,
+    topic: Optional[str] = None,
+    discovery_query: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """GET /channels - lists discovered YouTube channels with whitelist sorting logic."""
-    sys_logger.info("Listing channels endpoint accessed.")
+    """GET /channels - lists discovered YouTube channels with advanced pagination, sorting and filters."""
+    sys_logger.info("Listing channels endpoint accessed with advanced filters.")
     query = db.query(Channel)
+
+    # Apply Filters
     if german_only:
         query = query.filter(Channel.is_german == True)  # noqa: E712
-    if discord_status:
+    if discord_status and discord_status != "all":
         query = query.filter(Channel.discord_status == discord_status)
-    if discord_type:
+    if discord_type and discord_type != "all":
         query = query.filter(Channel.discord_type == discord_type)
-    if discord_source:
+    if discord_source and discord_source != "all":
         query = query.filter(Channel.discord_source == discord_source)
-        
-    # Whitelist sorting implementation
-    allowed_sort_fields = {
-        'created_at': Channel.created_at,
-        'channel_name': Channel.channel_name,
-        'subscribers': Channel.subscribers,
-        'last_crawled': Channel.last_crawled,
-        'country': Channel.country,
-        'detected_language': Channel.detected_language,
-    }
-    if sort_by in allowed_sort_fields:
-        sort_column = allowed_sort_fields[sort_by]
-        if sort_order == 'desc':
-            query = query.order_by(desc(sort_column))
+
+    if search:
+        query = query.filter(
+            (Channel.channel_name.ilike(f"%{search}%")) |
+            (Channel.channel_id.ilike(f"%{search}%")) |
+            (Channel.description.ilike(f"%{search}%"))
+        )
+
+    if country:
+        query = query.filter(Channel.country.ilike(f"%{country}%"))
+    if detected_language:
+        query = query.filter(Channel.detected_language.ilike(f"%{detected_language}%"))
+    if topic:
+        query = query.filter(Channel.topic.ilike(f"%{topic}%"))
+    if discovery_query:
+        query = query.filter(Channel.discovery_query.ilike(f"%{discovery_query}%"))
+
+    # Get Total Count (for headers)
+    total_count = query.count()
+    response.headers["X-Total-Count"] = str(total_count)
+    response.headers["Access-Control-Expose-Headers"] = "X-Total-Count"
+
+    # Apply Sorting
+    if sort_by:
+        col_attr = getattr(Channel, sort_by, None)
+        if col_attr is not None:
+            if sort_order == "desc":
+                query = query.order_by(desc(col_attr))
+            else:
+                query = query.order_by(col_attr)
         else:
-            query = query.order_by(sort_column)
+            query = query.order_by(desc(Channel.created_at))
     else:
         query = query.order_by(desc(Channel.created_at))
 
+    # Apply Pagination
     channels = query.offset(skip).limit(limit).all()
+    for ch in channels:
+        discord_link = db.query(CommunityLink).filter(
+            CommunityLink.channel_id == ch.channel_id,
+            CommunityLink.platform == "discord"
+        ).first()
+        ch.discord_url = discord_link.url if discord_link else None
     return channels
     @app.get("/channels/{channel_id}")
 def get_channel_detail(channel_id: str, db: Session = Depends(get_db)):
@@ -390,6 +421,10 @@ def get_channel_detail(channel_id: str, db: Session = Depends(get_db)):
 
     # Community Intelligence pre-populated links
     community_links = db.query(CommunityLink).filter(CommunityLink.channel_id == channel_id).all()
+
+    # Resolve discord URL dynamically on channel object
+    discord_link = next((l for l in community_links if l.platform == "discord"), None)
+    channel.discord_url = discord_link.url if discord_link else None
 
     return {
         "channel": channel,

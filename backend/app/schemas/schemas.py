@@ -70,6 +70,7 @@ class ChannelBase(BaseModel):
     discord_status: Optional[str] = "none"
     discord_type: Optional[str] = "unknown"
     discord_source: Optional[str] = "unknown"
+    discord_url: Optional[str] = None
 
 
 class ChannelCreate(ChannelBase):
