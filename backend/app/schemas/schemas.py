@@ -15,16 +15,12 @@ class HealthResponse(BaseModel):
 # Stats Schema
 class StatsResponse(BaseModel):
     total_channels: int
-    total_videos: int
-    german_channels: int
-    processed_videos: int
-    extracted_phrases: int
-    generated_queries: int
-    duplicate_rate: float
-    success_rate: float
+    discord_communities_count: int
+    discord_coverage_percentage: float
+    new_channels_today: int
     api_quota: int
     scheduler_status: str
-    latest_discoveries: List[dict]
+    latest_discords: List[dict]
 
 
 # Query Schemas

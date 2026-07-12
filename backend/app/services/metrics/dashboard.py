@@ -43,6 +43,15 @@ def get_overall_stats() -> dict:
         generated_queries = db.query(Query).count()
         transcripts_collected = db.query(Transcript).count()
 
+        # Calculate verified Discord communities count dynamically
+        from backend.app.models.models import CommunityLink
+        discord_communities_count = db.query(CommunityLink).filter(CommunityLink.platform == "discord").count()
+
+        # Calculate coverage %
+        discord_coverage_percentage = 0.0
+        if total_channels > 0:
+            discord_coverage_percentage = (discord_communities_count / total_channels) * 100.0
+
         # Dynamically calculate duplicate and success rates from query metrics
         total_queries = db.query(Query).count()
         duplicate_rate = 0.0
@@ -72,31 +81,31 @@ def get_overall_stats() -> dict:
         latest_job = db.query(SchedulerJob).order_by(SchedulerJob.updated_at.desc()).first()
         scheduler_status = latest_job.status if latest_job else "idle"
 
-        # Fetch latest channel discoveries
-        latest_channels = db.query(Channel).order_by(Channel.created_at.desc()).limit(5).all()
-        discoveries = []
-        for ch in latest_channels:
-            discoveries.append({
-                "channel_id": ch.channel_id,
-                "channel_name": ch.channel_name,
-                "subscribers": ch.subscribers,
-                "discovered_at": ch.created_at.isoformat() if ch.created_at else None
-            })
+        # Fetch latest verified Discord communities by joining CommunityLink with Channel
+        latest_discords = []
+        links = db.query(CommunityLink).filter(CommunityLink.platform == "discord").order_by(CommunityLink.detected_at.desc()).limit(5).all()
+        for link in links:
+            channel = db.query(Channel).filter(Channel.channel_id == link.channel_id).first()
+            if channel:
+                latest_discords.append({
+                    "id": str(link.id),
+                    "channel_id": channel.channel_id,
+                    "channel_name": channel.channel_name,
+                    "avatar": channel.avatar,
+                    "discord_status": channel.discord_status or "found",
+                    "discord_type": channel.discord_type or "unknown",
+                    "url": link.url,
+                    "detected_at": link.detected_at.isoformat() if link.detected_at else None
+                })
 
         return {
             "total_channels": total_channels,
-            "total_videos": total_videos,
-            "german_channels": german_channels,
-            "processed_videos": processed_videos,
-            "transcripts_collected": transcripts_collected,
-            "extracted_phrases": extracted_phrases,
-            "generated_queries": generated_queries,
+            "discord_communities_count": discord_communities_count,
+            "discord_coverage_percentage": discord_coverage_percentage,
             "new_channels_today": new_channels_today,
-            "duplicate_rate": duplicate_rate,
-            "success_rate": success_rate,
             "api_quota": api_quota_remaining,
             "scheduler_status": scheduler_status,
-            "latest_discoveries": discoveries
+            "latest_discords": latest_discords
         }
     except Exception as e:
         sys_logger.error(f"Failed to compile dashboard stats: {e}")
