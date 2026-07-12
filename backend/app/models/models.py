@@ -18,6 +18,13 @@ class Query(Base):
     effectiveness_score = Column(Float, default=0.0)
     last_executed = Column(DateTime, nullable=True)
     status = Column(String, default="active")  # active, exhausted, paused
+
+    # Trading Community Discovery fields
+    country = Column(String, nullable=True)
+    generation_source = Column(String, nullable=True)
+    channels_discovered = Column(Integer, default=0)
+    discords_found = Column(Integer, default=0)
+    success_rate = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -64,13 +71,41 @@ class Channel(Base):
     # Phase 1C Fields
     topic = Column(String, nullable=True)
 
-    # Phase 2A Fields for Community Discovery Refocus
+    # Trading Community Discovery investigation and Discord status fields
+    investigation_status = Column(String, nullable=True, default="pending")
     discord_status = Column(String, nullable=True, default="none")
     discord_type = Column(String, nullable=True, default="unknown")
     discord_source = Column(String, nullable=True, default="unknown")
+    confidence_score = Column(Float, default=0.0)
+    last_investigated = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class DiscordLink(Base):
+    __tablename__ = "discord_links"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    channel_id = Column(String, ForeignKey("channels.channel_id"), nullable=False)
+    invite_url = Column(String, nullable=False)
+    source = Column(String, nullable=True)
+    verification_status = Column(String, default="pending", nullable=False)
+    discord_type = Column(String, default="unknown", nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    verified_at = Column(DateTime, nullable=True)
+
+
+class ChannelInvestigation(Base):
+    __tablename__ = "channel_investigations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    channel_id = Column(String, ForeignKey("channels.channel_id"), nullable=False)
+    status = Column(String, default="pending", nullable=False)
+    sources_checked = Column(Text, nullable=True)
+    discord_found = Column(Boolean, default=False, nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
 
 
 class Video(Base):
