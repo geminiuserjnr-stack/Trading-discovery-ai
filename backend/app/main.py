@@ -374,7 +374,9 @@ def list_channels(
         ).first()
         ch.discord_url = discord_link.url if discord_link else None
     return channels
-    @app.get("/channels/{channel_id}")
+
+
+@app.get("/channels/{channel_id}")
 def get_channel_detail(channel_id: str, db: Session = Depends(get_db)):
     """GET /channels/{channel_id} - detailed profile of a channel with videos and phrases."""
     sys_logger.info(f"Retrieving channel details for: {channel_id}")
@@ -465,7 +467,7 @@ def get_video_detail(video_id: str, db: Session = Depends(get_db)):
 
     channel = db.query(Channel).filter(Channel.channel_id == video.channel_id).first()
     transcript = db.query(Transcript).filter(Transcript.video_id == video_id).first()
-        # Extracted phrases in this video
+    # Extracted phrases in this video
     video_phrases = db.query(VideoPhrase).filter(VideoPhrase.video_id == video_id).all()
 
     # Processing history
@@ -583,4 +585,3 @@ def get_phrase_detail(phrase: str, db: Session = Depends(get_db)):
         "frequency_trend": frequency_trend,
         "related_phrases": related_phrases
     }
-    
