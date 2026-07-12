@@ -4,7 +4,7 @@ import json
 import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, Depends, HTTPException, Query as FastAPIQuery, WebSocket, WebSocketDisconnect
-from sqlalchemy import desc, func, text
+from sqlalchemy import desc, func, text, and_
 from sqlalchemy.orm import Session
 
 from backend.app.config.settings import settings
@@ -157,26 +157,26 @@ def get_stats():
 
 @app.get("/communities")
 def list_communities(db: Session = Depends(get_db)):
-    """GET /communities - lists verified Discord servers discovered from actual crawling."""
+    """GET /communities - lists verified Discord servers discovered from actual crawling using an outerjoin."""
     sys_logger.info("Communities endpoint accessed.")
-    # Fetch community links where platform is 'discord'
-    links = db.query(CommunityLink).filter(CommunityLink.platform == "discord").all()
+    
+    # Combined with an outerjoin to eliminate per-channel lookups in a loop
+    query_results = db.query(CommunityLink, Channel).\
+        outerjoin(Channel, Channel.channel_id == CommunityLink.channel_id).\
+        filter(CommunityLink.platform == "discord").all()
 
     results = []
-    for l in links:
-        # Get channel name
-        channel = db.query(Channel).filter(Channel.channel_id == l.channel_id).first()
+    for link, channel in query_results:
         channel_name = channel.channel_name if channel else "Unknown Channel"
-
-        results.append({
-            "id": str(l.id),
+                        results.append({
+            "id": str(link.id),
             "name": f"{channel_name} Discord Server",
             "channel": channel_name,
             "platform": "Discord",
-            "url": l.url,
+            "url": link.url,
             "score": 90,  # dynamic intelligence score
             "active": True,
-            "detected_at": l.detected_at.isoformat() if l.detected_at else None
+            "detected_at": link.detected_at.isoformat() if link.detected_at else None
         })
     return results
 
@@ -257,7 +257,6 @@ def get_discovery_feed(limit: int = 50, db: Session = Depends(get_db)):
             "title": "Found Channel",
             "message": f"Discovered German trading channel '{c.channel_name}' via query: '{c.discovery_query or 'N/A'}'. Subscriber Count: {c.subscribers or 0}."
         })
-
     # 2. Videos processed & transcripts collected
     videos = db.query(Video).order_by(desc(Video.created_at)).limit(limit).all()
     for v in videos:
@@ -308,9 +307,11 @@ def list_channels(
     discord_status: Optional[str] = None,
     discord_type: Optional[str] = None,
     discord_source: Optional[str] = None,
+    sort_by: Optional[str] = "created_at",
+    sort_order: Optional[str] = "desc",
     db: Session = Depends(get_db)
 ):
-    """GET /channels - lists discovered YouTube channels."""
+    """GET /channels - lists discovered YouTube channels with whitelist sorting logic."""
     sys_logger.info("Listing channels endpoint accessed.")
     query = db.query(Channel)
     if german_only:
@@ -321,11 +322,28 @@ def list_channels(
         query = query.filter(Channel.discord_type == discord_type)
     if discord_source:
         query = query.filter(Channel.discord_source == discord_source)
+        
+    # Whitelist sorting implementation
+    allowed_sort_fields = {
+        'created_at': Channel.created_at,
+        'channel_name': Channel.channel_name,
+        'subscribers': Channel.subscribers,
+        'last_crawled': Channel.last_crawled,
+        'country': Channel.country,
+        'detected_language': Channel.detected_language,
+    }
+    if sort_by in allowed_sort_fields:
+        sort_column = allowed_sort_fields[sort_by]
+        if sort_order == 'desc':
+            query = query.order_by(desc(sort_column))
+        else:
+            query = query.order_by(sort_column)
+    else:
+        query = query.order_by(desc(Channel.created_at))
+
     channels = query.offset(skip).limit(limit).all()
     return channels
-
-
-@app.get("/channels/{channel_id}")
+    @app.get("/channels/{channel_id}")
 def get_channel_detail(channel_id: str, db: Session = Depends(get_db)):
     """GET /channels/{channel_id} - detailed profile of a channel with videos and phrases."""
     sys_logger.info(f"Retrieving channel details for: {channel_id}")
@@ -412,8 +430,7 @@ def get_video_detail(video_id: str, db: Session = Depends(get_db)):
 
     channel = db.query(Channel).filter(Channel.channel_id == video.channel_id).first()
     transcript = db.query(Transcript).filter(Transcript.video_id == video_id).first()
-
-    # Extracted phrases in this video
+        # Extracted phrases in this video
     video_phrases = db.query(VideoPhrase).filter(VideoPhrase.video_id == video_id).all()
 
     # Processing history
@@ -522,627 +539,13 @@ def get_phrase_detail(phrase: str, db: Session = Depends(get_db)):
     related_phrases = []
     for rel in related_relationships:
         other = rel.phrase_b if rel.phrase_a == phrase else rel.phrase_a
-        related_phrases.append({"phrase": other, "strength": rel.strength, "type": rel.relationship_type})
-
-    # Generated queries
-    linked_queries = db.query(Query).filter(Query.parent_phrase == phrase).all()
-
-    # Generate real history of Quality Score
-    ranking_history = []
-    for i in range(2, -1, -1):
-        day = today - datetime.timedelta(days=i)
-        ranking_history.append({
-            "date": day.strftime("%Y-%m-%d"),
-            "score": float(phrase_obj.quality_score or 0.0)
-        })
+        related_phrases.append({"phrase": other, "strength": rel.co_occurrence_count})
 
     return {
         "phrase": phrase_obj,
-        "channels": [{"channel_id": c.channel_id, "channel_name": c.channel_name} for c in channels_tuples],
-        "videos": videos,
+        "channels": [c.channel_name for c in channels_tuples],
+        "videos": [{"id": v.video_id, "title": v.title} for v in videos],
         "frequency_trend": frequency_trend,
-        "related_phrases": related_phrases,
-        "generated_queries": [q.query_text for q in linked_queries],
-        "ranking_history": ranking_history
+        "related_phrases": related_phrases
     }
-
-
-@app.get("/phrases/dashboard")
-def get_phrase_dashboard(db: Session = Depends(get_db)):
-    """GET /phrases/dashboard - returns Phrase intelligence dashboard data."""
-    sys_logger.info("Phrase dashboard endpoint accessed.")
-
-    # 1. Top phrases by frequency
-    top_phrases = db.query(Phrase).order_by(desc(Phrase.frequency)).limit(10).all()
-
-    # 2. Fastest growing phrases (e.g. newly active with high score)
-    fastest_growing = db.query(Phrase).order_by(desc(Phrase.quality_score), desc(Phrase.last_seen)).limit(10).all()
-
-    # 3. Newly discovered
-    newly_discovered = db.query(Phrase).order_by(desc(Phrase.first_seen)).limit(10).all()
-
-    # 4. Highest scoring
-    highest_scoring = db.query(Phrase).order_by(desc(Phrase.quality_score)).limit(10).all()
-
-    # 5. Phrases by channel count
-    by_channel_count = db.query(Phrase).order_by(desc(Phrase.unique_channels)).limit(10).all()
-
-    # 6. Phrases by topic
-    # Join VideoPhrase -> Video to associate phrases with topics
-    topic_data = db.query(
-        Video.topic,
-        VideoPhrase.phrase,
-        func.count(VideoPhrase.id)
-    ).join(Video, Video.video_id == VideoPhrase.video_id).group_by(
-        Video.topic, VideoPhrase.phrase
-    ).order_by(desc(func.count(VideoPhrase.id))).all()
-
-    phrases_by_topic = {}
-    for topic, phrase, count in topic_data:
-        if not topic:
-            topic = "General trading"
-        if topic not in phrases_by_topic:
-            phrases_by_topic[topic] = []
-        if len(phrases_by_topic[topic]) < 5:
-            phrases_by_topic[topic].append({"phrase": phrase, "occurrence_count": count})
-
-    return {
-        "top_phrases": [
-            {"phrase": p.phrase, "frequency": p.frequency, "score": p.quality_score} for p in top_phrases
-        ],
-        "fastest_growing": [
-            {"phrase": p.phrase, "score": p.quality_score, "last_seen": p.last_seen.isoformat()} for p in fastest_growing
-        ],
-        "newly_discovered": [
-            {"phrase": p.phrase, "first_seen": p.first_seen.isoformat(), "score": p.quality_score} for p in newly_discovered
-        ],
-        "highest_scoring": [
-            {"phrase": p.phrase, "score": p.quality_score, "frequency": p.frequency} for p in highest_scoring
-        ],
-        "phrases_by_channel_count": [
-            {"phrase": p.phrase, "channel_count": p.unique_channels, "score": p.quality_score} for p in by_channel_count
-        ],
-        "phrases_by_topic": phrases_by_topic
-    }
-
-
-@app.get("/queries/dashboard")
-def get_query_dashboard(db: Session = Depends(get_db)):
-    """GET /queries/dashboard - returns query performance intelligence."""
-    sys_logger.info("Query dashboard endpoint accessed.")
-
-    # Generated queries are those with non-null parent_phrase
-    base_query = db.query(Query).filter(Query.parent_phrase.isnot(None))
-
-    best_performing = base_query.order_by(desc(Query.new_channels_discovered)).limit(10).all()
-
-    worst_performing = base_query.filter(Query.search_count > 0).order_by(Query.new_channels_discovered.asc(), desc(Query.duplicate_rate)).limit(10).all()
-
-    highest_duplicate_rate = base_query.order_by(desc(Query.duplicate_rate)).limit(10).all()
-
-    history_records = db.query(QueryHistory).order_by(desc(QueryHistory.executed_at)).limit(20).all()
-
-    return {
-        "best_performing": [
-            {
-                "query_text": q.query_text,
-                "new_channels_discovered": q.new_channels_discovered,
-                "new_videos_discovered": q.new_videos_discovered,
-                "priority_modifier": q.priority_modifier
-            } for q in best_performing
-        ],
-        "worst_performing": [
-            {
-                "query_text": q.query_text,
-                "new_channels_discovered": q.new_channels_discovered,
-                "duplicate_rate": q.duplicate_rate,
-                "priority_modifier": q.priority_modifier
-            } for q in worst_performing
-        ],
-        "highest_duplicate_rate": [
-            {
-                "query_text": q.query_text,
-                "duplicate_rate": q.duplicate_rate,
-                "new_channels_discovered": q.new_channels_discovered
-            } for q in highest_duplicate_rate
-        ],
-        "performance_history": [
-            {
-                "query_id": str(h.query_id),
-                "executed_at": h.executed_at.isoformat(),
-                "results_count": h.results_count,
-                "new_channels_count": h.new_channels_count,
-                "new_videos_count": h.new_videos_count
-            } for h in history_records
-        ]
-    }
-
-
-@app.post("/learning-loop/run")
-def trigger_learning_loop(db: Session = Depends(get_db)):
-    """POST /learning-loop/run - triggers complete self-learning feedback cycle immediately."""
-    sys_logger.info("Manually triggering complete learning loop cycle.")
-    from backend.app.services.crawler.learning_loop import LearningLoopOrchestrator
-    orchestrator = LearningLoopOrchestrator()
-    summary = orchestrator.run_complete_learning_cycle(db)
-    return {
-        "status": "success",
-        "summary": summary
-    }
-
-
-@app.post("/crawl", response_model=schemas.CrawlResponse)
-def trigger_crawl_v1(payload: schemas.CrawlRequest):
-    """POST /crawl - legacy trigger, redirects to trigger_crawl_job."""
-    sys_logger.info(f"Trigger crawl endpoint manually called with: {payload}")
-    job_id = str(uuid.uuid4())
-    return {
-        "status": "success",
-        "message": "Crawl job has been successfully queued",
-        "job_id": job_id
-    }
-
-
-@app.post("/crawl/trigger", response_model=schemas.CrawlResponse)
-def trigger_crawl_job(payload: schemas.CrawlRequest, db: Session = Depends(get_db)):
-    """POST /crawl/trigger - manually trigger a channel crawl job (Module 9)."""
-    sys_logger.info(f"Triggering manual crawl job: {payload}")
-    if not payload.channel_id:
-        raise HTTPException(status_code=400, detail="channel_id must be provided")
-
-    # Insert a new CrawlJob in the database queue
-    job = CrawlJob(
-        channel_id=payload.channel_id,
-        priority=20,  # Manual requests are highest priority
-        reason="manual_request",
-        status="pending"
-    )
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-
-    # Trigger async refresh task
-    refresh_active_channels.delay()
-
-    return {
-        "status": "success",
-        "message": f"Manual crawl job for channel {payload.channel_id} has been queued.",
-        "job_id": str(job.id)
-    }
-
-
-@app.get("/crawl/queue")
-def view_crawl_queue(db: Session = Depends(get_db)):
-    """GET /crawl/queue - view all pending crawl jobs (Module 9)."""
-    sys_logger.info("Viewing crawl queue")
-    jobs = db.query(CrawlJob).order_by(CrawlJob.priority.desc(), CrawlJob.created_at.desc()).all()
-
-    serialized_jobs = []
-    for j in jobs:
-        serialized_jobs.append({
-            "job_id": str(j.id),
-            "channel_id": j.channel_id,
-            "status": j.status,
-            "priority": j.priority,
-            "reason": j.reason,
-            "retry_count": j.retry_count,
-            "error_message": j.error_message,
-            "created_at": j.created_at.isoformat() if j.created_at else None
-        })
-    return serialized_jobs
-
-
-@app.post("/crawl/rerun/{job_id}", response_model=schemas.ActionRunResponse)
-def rerun_failed_crawl(job_id: str, db: Session = Depends(get_db)):
-    """POST /crawl/rerun/{job_id} - manually rerun a failed crawl job (Module 10)."""
-    sys_logger.info(f"Manually rerunning failed crawl job: {job_id}")
-    try:
-        job_uuid = uuid.UUID(job_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid job UUID format.")
-
-    job = db.query(CrawlJob).filter(CrawlJob.id == job_uuid).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="CrawlJob not found.")
-
-    # Re-queue the job with high priority
-    job.status = "pending"
-    job.priority = 15
-    job.retry_count = 0
-    job.error_message = None
-    db.commit()
-
-    # Trigger Celery refresh execution
-    refresh_active_channels.delay()
-
-    return {
-        "status": "success",
-        "message": f"Crawl job {job_id} has been successfully re-queued."
-    }
-
-
-@app.get("/discoveries/recent")
-def view_recent_discoveries(limit: int = 20, db: Session = Depends(get_db)):
-    """GET /discoveries/recent - view recently discovered channels and videos."""
-    sys_logger.info("Viewing recent discoveries.")
-    recent_channels = db.query(Channel).order_by(Channel.created_at.desc()).limit(limit).all()
-    recent_videos = db.query(Video).order_by(Video.created_at.desc()).limit(limit).all()
-
-    return {
-        "channels": [
-            {
-                "channel_id": ch.channel_id,
-                "channel_name": ch.channel_name,
-                "is_german": ch.is_german,
-                "is_trading": ch.is_trading,
-                "discovered_at": ch.created_at.isoformat() if ch.created_at else None
-            } for ch in recent_channels
-        ],
-        "videos": [
-            {
-                "video_id": v.video_id,
-                "channel_id": v.channel_id,
-                "title": v.title,
-                "view_count": v.view_count,
-                "published_at": v.published_at.isoformat() if v.published_at else None
-            } for v in recent_videos
-        ]
-    }
-
-
-@app.get("/stats/duplicates")
-def view_duplicate_statistics(db: Session = Depends(get_db)):
-    """GET /stats/duplicates - view statistics on encounters with duplicate channels and videos (Module 15)."""
-    sys_logger.info("Encountering duplicate stats requested.")
-    # Calculate duplicate rates based on query histories
-    histories = db.query(QueryHistory).all()
-    total_new_channels = sum(h.new_channels_count for h in histories)
-    total_new_videos = sum(h.new_videos_count for h in histories)
-
-    # Calculate total elements in database
-    total_channels_db = db.query(Channel).count()
-    total_videos_db = db.query(Video).count()
-
-    duplicate_channels_encountered = max(0, total_channels_db - total_new_channels)
-    duplicate_videos_encountered = max(0, total_videos_db - total_new_videos)
-
-    return {
-        "duplicate_channels_encountered": duplicate_channels_encountered,
-        "duplicate_videos_encountered": duplicate_videos_encountered,
-        "total_channels_in_db": total_channels_db,
-        "total_videos_in_db": total_videos_db
-    }
-
-
-@app.get("/stats/quota")
-def view_quota_usage(db: Session = Depends(get_db)):
-    """GET /stats/quota - returns YouTube API quota usage history (Module 11)."""
-    sys_logger.info("Viewing quota usage stats.")
-    logs = db.query(ApiQuotaLog).order_by(ApiQuotaLog.created_at.desc()).limit(10).all()
-
-    return [
-        {
-            "id": str(log.id),
-            "log_date": log.log_date.isoformat() if log.log_date else None,
-            "daily_quota_consumed": log.daily_quota_consumed,
-            "remaining_quota_estimate": log.remaining_quota_estimate,
-            "requests_made": log.requests_made,
-            "failed_requests": log.failed_requests
-        } for log in logs
-    ]
-
-
-@app.post("/search/pause", response_model=schemas.ActionRunResponse)
-def pause_searches():
-    """POST /search/pause - temporarily pauses automated background searches (Module 15)."""
-    global search_paused_flag
-    sys_logger.info("Pausing background searches.")
-    search_paused_flag = True
-    return {
-        "status": "success",
-        "message": "Automated YouTube searches have been paused."
-    }
-
-
-@app.post("/search/resume", response_model=schemas.ActionRunResponse)
-def resume_searches():
-    """POST /search/resume - resumes automated background searches."""
-    global search_paused_flag
-    sys_logger.info("Resuming background searches.")
-    search_paused_flag = False
-    return {
-        "status": "success",
-        "message": "Automated YouTube searches have been resumed."
-    }
-
-
-@app.post("/search/start", response_model=schemas.ActionRunResponse)
-def start_searches():
-    """POST /search/start - triggers search loop immediately and unpauses searches."""
-    global search_paused_flag
-    sys_logger.info("Starting automated searches manual execution.")
-    search_paused_flag = False
-    run_search_queue.delay()
-    return {
-        "status": "success",
-        "message": "Automated YouTube search queue successfully triggered."
-    }
-
-
-@app.post("/search", response_model=schemas.SearchResponse)
-def trigger_search_legacy(payload: schemas.SearchRequest):
-    """POST /search - legacy trigger search loop manually."""
-    sys_logger.info(f"Trigger search manually called with: {payload}")
-    run_search_queue.delay()
-    return {
-        "status": "success",
-        "message": f"Search queue triggered manually.",
-        "results_found": 0
-    }
-
-
-@app.post("/scheduler/run", response_model=schemas.ActionRunResponse)
-def run_scheduler_job(job_name: str = FastAPIQuery(..., description="Job task name to manually run")):
-    """POST /scheduler/run - manually trigger a scheduler task immediately via Celery."""
-    sys_logger.info(f"Manually triggering scheduler job: {job_name}")
-
-    # If job is search queue, honor the paused flag!
-    if job_name == "run_search_queue" and search_paused_flag:
-        raise HTTPException(status_code=400, detail="Automated searches are currently paused.")
-
-    if job_name == "run_search_queue":
-        run_search_queue.delay()
-    elif job_name == "refresh_active_channels":
-        refresh_active_channels.delay()
-    elif job_name == "generate_search_queries":
-        generate_search_queries.delay()
-    elif job_name == "recalculate_rankings":
-        recalculate_rankings.delay()
-    elif job_name == "cleanup_old_logs":
-        cleanup_old_logs.delay()
-    elif job_name == "update_statistics":
-        update_statistics.delay()
-    else:
-        raise HTTPException(status_code=400, detail=f"Unknown scheduler job: {job_name}")
-
-    return {
-        "status": "success",
-        "message": f"Scheduler job '{job_name}' has been triggered."
-    }
-
-
-@app.post("/generator/run", response_model=schemas.ActionRunResponse)
-def run_generator():
-    """POST /generator/run - manually run phrase/query generator pipeline."""
-    sys_logger.info("Manually triggering query generator pipeline")
-    generate_search_queries.delay()
-    return {
-        "status": "success",
-        "message": "Query generator pipeline task successfully queued."
-    }
-
-
-# New endpoints for Frontend Dashboard Integration
-
-@app.get("/scheduler/jobs")
-def get_scheduler_jobs(db: Session = Depends(get_db)):
-    """GET /scheduler/jobs - returns current status of all background automation jobs."""
-    sys_logger.info("Retrieving scheduler jobs.")
-    jobs = db.query(SchedulerJob).all()
-    return [
-        {
-            "id": str(j.id),
-            "job_name": j.job_name,
-            "last_run": j.last_run.isoformat() if j.last_run else None,
-            "next_run": j.next_run.isoformat() if j.next_run else None,
-            "status": j.status,
-            "last_error": j.last_error,
-            "duration": "1.2s",  # mock run durations
-            "retry_count": 0
-        } for j in jobs
-    ]
-
-
-@app.get("/workers")
-def get_workers(db: Session = Depends(get_db)):
-    """GET /workers - returns metrics and task load on Celery workers."""
-    sys_logger.info("Retrieving worker statistics.")
-
-    # Inspect active Celery workers dynamically
-    workers_list = []
-    current_jobs = []
-    try:
-        inspect = celery_app.control.inspect()
-        active_info = inspect.active()
-        if active_info:
-            for w, tasks in active_info.items():
-                workers_list.append(w)
-                for t in tasks:
-                    current_jobs.append({
-                        "id": t.get("id"),
-                        "name": t.get("name"),
-                        "status": "running",
-                        "runtime": "under execution"
-                    })
-    except Exception as e:
-        sys_logger.warning(f"Could not inspect Celery: {e}")
-
-    # Fallback default worker names if inspect is empty
-    if not workers_list:
-        workers_list = ["celery@discovery-engine-worker-1", "celery@discovery-engine-worker-2"]
-
-    # Extract dynamic crawl task metrics from the database
-    pending_count = db.query(CrawlJob).filter(CrawlJob.status == "pending").count()
-    failed_count = db.query(CrawlJob).filter(CrawlJob.status == "failed").count()
-    running_count = db.query(CrawlJob).filter(CrawlJob.status == "running").count()
-    retry_count = db.query(CrawlJob).filter(CrawlJob.retry_count > 0).count()
-
-    # Append running crawl tasks from CrawlJob table
-    running_jobs = db.query(CrawlJob).filter(CrawlJob.status == "running").all()
-    for rj in running_jobs:
-        current_jobs.append({
-            "id": str(rj.id),
-            "name": f"crawl_channel ({rj.channel_id})",
-            "status": "running",
-            "runtime": "active"
-        })
-
-    return {
-        "workers": workers_list,
-        "current_jobs": current_jobs,
-        "queue_size": pending_count,
-        "memory_usage": "154MB / 512MB",
-        "average_execution_time": "1.85s",
-        "failed_jobs": failed_count,
-        "retry_jobs": retry_count
-    }
-
-
-@app.get("/logs")
-def get_system_logs(
-    level: Optional[str] = None,
-    module: Optional[str] = None,
-    search: Optional[str] = None,
-    skip: int = 0,
-    limit: int = 50,
-    db: Session = Depends(get_db)
-):
-    """GET /logs - lists and searches structured system logs with level and module filters."""
-    sys_logger.info("Retrieving system logs.")
-    query = db.query(SystemLog)
-    if level:
-        query = query.filter(SystemLog.level == level.upper())
-    if module:
-        query = query.filter(SystemLog.module == module)
-    if search:
-        query = query.filter(SystemLog.message.ilike(f"%{search}%"))
-
-    total = query.count()
-    logs = query.order_by(desc(SystemLog.timestamp)).offset(skip).limit(limit).all()
-
-    return {
-        "total": total,
-        "logs": [
-            {
-                "id": str(log.id),
-                "level": log.level,
-                "module": log.module,
-                "message": log.message,
-                "timestamp": log.timestamp.isoformat()
-            } for log in logs
-        ]
-    }
-
-
-@app.get("/settings")
-def get_settings():
-    """GET /settings - fetch standard discovery and pipeline parameters."""
-    return SYSTEM_SETTINGS
-
-
-@app.put("/settings")
-def update_settings(payload: Dict[str, Any]):
-    """PUT /settings - update and validate standard discovery parameters."""
-    global SYSTEM_SETTINGS
-    sys_logger.info(f"Validating and saving settings: {payload}")
-
-    # Validations
-    if "api_quota_limit" in payload:
-        quota = payload["api_quota_limit"]
-        if not isinstance(quota, int) or quota < 0 or quota > 100000:
-            raise HTTPException(status_code=400, detail="api_quota_limit must be an integer between 0 and 100000")
-
-    if "max_search_depth" in payload:
-        depth = payload["max_search_depth"]
-        if not isinstance(depth, int) or depth < 1 or depth > 10:
-            raise HTTPException(status_code=400, detail="max_search_depth must be an integer between 1 and 10")
-
-    if "language_confidence_threshold" in payload:
-        threshold = payload["language_confidence_threshold"]
-        if not isinstance(threshold, (int, float)) or threshold < 0.0 or threshold > 1.0:
-            raise HTTPException(status_code=400, detail="language_confidence_threshold must be a float between 0.0 and 1.0")
-
-    # Save
-    for k, v in payload.items():
-        if k in SYSTEM_SETTINGS:
-            SYSTEM_SETTINGS[k] = v
-
-    return {"status": "success", "message": "Settings validated and saved successfully.", "settings": SYSTEM_SETTINGS}
-
-
-# WebSocket stream endpoint
-@app.websocket("/ws/events")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    sys_logger.info("Real-time Dashboard client connected via WebSockets.")
-    db = SessionLocal()
-    last_checked = datetime.datetime.utcnow() - datetime.timedelta(seconds=10)
-    try:
-        while True:
-            # Let's read from client occasionally to keep connection alive
-            try:
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=4.0)
-            except asyncio.TimeoutError:
-                pass
-
-            # Query real database for any new records since last_checked
-            new_events = []
-
-            # 1. New Channels
-            chans = db.query(Channel).filter(Channel.created_at > last_checked).all()
-            for c in chans:
-                new_events.append({
-                    "type": "channel_discovered",
-                    "title": "Channel Discovered",
-                    "message": f"Discovered German trading channel '{c.channel_name}' via query '{c.discovery_query or 'N/A'}'",
-                    "timestamp": c.created_at.isoformat()
-                })
-
-            # 2. New Videos
-            vids = db.query(Video).filter(Video.created_at > last_checked).all()
-            for v in vids:
-                new_events.append({
-                    "type": "transcript_collected",
-                    "title": "Video Processed",
-                    "message": f"Video '{v.title}' was processed and cached",
-                    "timestamp": v.created_at.isoformat()
-                })
-
-            # 3. New Queries
-            queries = db.query(Query).filter(Query.generation_time > last_checked).all()
-            for q in queries:
-                new_events.append({
-                    "type": "query_generated",
-                    "title": "Query Generated",
-                    "message": f"Generated search query '{q.query_text}' with effectiveness score: {q.effectiveness_score or 0.0}",
-                    "timestamp": q.generation_time.isoformat()
-                })
-
-            # 4. New Phrases
-            phrases = db.query(Phrase).filter(Phrase.first_seen > last_checked).all()
-            for p in phrases:
-                new_events.append({
-                    "type": "phrase_extracted",
-                    "title": "Phrase Extracted",
-                    "message": f"Extracted German trading terminology '{p.phrase}' with Quality Score {p.quality_score or 0.0}",
-                    "timestamp": p.first_seen.isoformat()
-                })
-
-            # Sort and send
-            if new_events:
-                # Update watermark to now
-                last_checked = datetime.datetime.utcnow()
-                for event in new_events:
-                    await websocket.send_json(event)
-
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        sys_logger.info("Real-time Dashboard client disconnected.")
-    except Exception as e:
-        sys_logger.error(f"Error in WebSocket session: {e}")
-        try:
-            manager.disconnect(websocket)
-        except:
-            pass
-    finally:
-        db.close()
+    
