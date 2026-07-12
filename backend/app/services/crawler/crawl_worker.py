@@ -151,6 +151,12 @@ def process_channel_crawl_job(db: Session, job: CrawlJob) -> bool:
         channel.needs_manual_review = quality["needs_manual_review"]
         channel.active = quality["active"]
 
+        # Initialize default Discord discovery states
+        has_verified_discord = False
+        discord_source = "unknown"
+        discord_type = "unknown"
+        has_discord_mention = "discord" in desc.lower() if desc else False
+
         # Parse & store community links in channel description (Module 14)
         chan_links = extract_community_links(desc)
         for link in chan_links:
@@ -159,13 +165,22 @@ def process_channel_crawl_job(db: Session, job: CrawlJob) -> bool:
                 CommunityLink.channel_id == channel.channel_id,
                 CommunityLink.url == link["url"]
             ).first()
-            if not existing_link:
-                # If platform is Discord, validate first!
-                if link["platform"] == "discord":
+
+            is_valid_discord = False
+            if link["platform"] == "discord":
+                if not existing_link:
                     invite_details = validate_discord_invite(link["url"])
-                    if not invite_details:
-                        sys_logger.warning(f"Discarding invalid Discord invite link: {link['url']}")
-                        continue
+                    if invite_details:
+                        is_valid_discord = True
+                else:
+                    is_valid_discord = True
+
+                if is_valid_discord:
+                    has_verified_discord = True
+                    discord_source = "bio"
+                    discord_type = "paid" if desc and any(kw in desc.lower() for kw in ["paid", "premium", "vip", "abo", "coaching", "patreon", "kurs", "mitglied"]) else "free"
+
+            if not existing_link and (link["platform"] != "discord" or is_valid_discord):
                 comm_link = CommunityLink(
                     channel_id=channel.channel_id,
                     platform=link["platform"],
@@ -281,13 +296,24 @@ def process_channel_crawl_job(db: Session, job: CrawlJob) -> bool:
                         CommunityLink.video_id == vid_id,
                         CommunityLink.url == lk["url"]
                     ).first()
-                    if not existing_lk:
-                        # If platform is Discord, validate first!
-                        if lk["platform"] == "discord":
+
+                    is_valid_discord = False
+                    if lk["platform"] == "discord":
+                        if vid_desc and "discord" in vid_desc.lower():
+                            has_discord_mention = True
+                        if not existing_lk:
                             invite_details = validate_discord_invite(lk["url"])
-                            if not invite_details:
-                                sys_logger.warning(f"Discarding invalid Discord invite link in video description: {lk['url']}")
-                                continue
+                            if invite_details:
+                                is_valid_discord = True
+                        else:
+                            is_valid_discord = True
+
+                        if is_valid_discord and not has_verified_discord:
+                            has_verified_discord = True
+                            discord_source = "description"
+                            discord_type = "paid" if vid_desc and any(kw in vid_desc.lower() for kw in ["paid", "premium", "vip", "abo", "coaching", "patreon", "kurs", "mitglied"]) else "free"
+
+                    if not existing_lk and (lk["platform"] != "discord" or is_valid_discord):
                         comm_lk = CommunityLink(
                             channel_id=v_channel_id,
                             video_id=vid_id,
@@ -297,6 +323,20 @@ def process_channel_crawl_job(db: Session, job: CrawlJob) -> bool:
                         )
                         db.add(comm_lk)
 
+        # Update channel Discord status fields before committing
+        if has_verified_discord:
+            channel.discord_status = "found"
+            channel.discord_source = discord_source
+            channel.discord_type = discord_type
+        elif has_discord_mention:
+            channel.discord_status = "mentioned"
+            channel.discord_source = "unknown"
+            channel.discord_type = "unknown"
+        else:
+            channel.discord_status = "none"
+            channel.discord_source = "unknown"
+            channel.discord_type = "unknown"
+
         # Update metrics on job
         job.status = "completed"
         job.completed_at = datetime.datetime.utcnow()
@@ -304,7 +344,7 @@ def process_channel_crawl_job(db: Session, job: CrawlJob) -> bool:
         job.videos_found = new_vids_added
 
         db.commit()
-        sys_logger.info(f"Crawl worker successfully finished channel crawl for {job.channel_id}. Added {new_vids_added} new videos.")
+        sys_logger.info(f"Crawl worker successfully finished channel crawl for {job.channel_id}. Added {new_vids_added} new videos. Discord status: {channel.discord_status}")
         return True
 
     except Exception as e:

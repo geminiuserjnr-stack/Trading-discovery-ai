@@ -64,6 +64,11 @@ class Channel(Base):
     # Phase 1C Fields
     topic = Column(String, nullable=True)
 
+    # Phase 2A Fields for Community Discovery Refocus
+    discord_status = Column(String, nullable=True, default="none")
+    discord_type = Column(String, nullable=True, default="unknown")
+    discord_source = Column(String, nullable=True, default="unknown")
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
